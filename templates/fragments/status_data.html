@@ -1,0 +1,37 @@
+<div class="status-page-header">
+    <div class="overall-banner {{ overall_css }}">
+        {{ overall_label }}
+    </div>
+</div>
+
+<div class="status-list">
+    {% for svc in services %}
+    <div class="status-row">
+        <div class="status-row-header">
+            <div class="status-row-name">
+                <span class="status-dot dot-{{ svc.current_state_css }}"></span>
+                <strong>{{ svc.name }}</strong>
+                {% if !svc.subname.is_empty() %}
+                <small class="subname">{{ svc.subname }}</small>
+                {% endif %}
+            </div>
+            <div class="status-row-uptime">
+                {{ svc.uptime_pct }} uptime
+            </div>
+        </div>
+        <div class="timeline-bar">
+            {% for slot in svc.timeline %}
+            <div class="timeline-slot {{ slot.css_class }}" title="{{ slot.title }}"></div>
+            {% endfor %}
+        </div>
+        <div class="timeline-labels">
+            <span>24h ago</span>
+            <span>Now</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if services.is_empty() %}
+<p class="status-empty">No monitored services configured.</p>
+{% endif %}

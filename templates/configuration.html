@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block username %}{{ username }}{% endblock %}
+{% block title %}Configuration — KernelCI Status{% endblock %}
+
+{% block content %}
+<h2>Configuration</h2>
+
+{% if !error.is_empty() %}
+<div class="error-message">{{ error }}</div>
+{% endif %}
+{% if !success.is_empty() %}
+<div class="success-message">{{ success }}</div>
+{% endif %}
+
+<form method="post" action="/admin/configuration">
+    <article>
+        <header><h3>Scheduler Settings</h3></header>
+        <div class="grid">
+            <label>
+                Check Interval (minutes)
+                <input type="number" name="check_interval" value="{{ c.check_interval }}" placeholder="5" min="1" max="1440">
+                <small>How often endpoints are probed. Default: 5 minutes.</small>
+            </label>
+            <label>
+                Retries on Failure
+                <input type="number" name="check_retries" value="{{ c.check_retries }}" placeholder="3" min="0" max="10">
+                <small>Number of retries before marking an endpoint as down. Default: 3.</small>
+            </label>
+        </div>
+    </article>
+
+    <article>
+        <header><h3>SMTP Settings</h3></header>
+        <div class="grid">
+            <label>
+                SMTP Server
+                <input type="text" name="smtp_host" value="{{ c.smtp_host }}" placeholder="smtp.example.com">
+            </label>
+            <label>
+                SMTP Port
+                <input type="number" name="smtp_port" value="{{ c.smtp_port }}" placeholder="587" min="1" max="65535">
+            </label>
+        </div>
+        <div class="grid">
+            <label>
+                SMTP Username
+                <input type="text" name="smtp_username" value="{{ c.smtp_username }}" placeholder="user@example.com">
+            </label>
+            <label>
+                SMTP Password
+                <input type="password" name="smtp_password" placeholder="{% if c.smtp_password.is_empty() %}Not set{% else %}••••••••{% endif %}" autocomplete="off">
+            </label>
+        </div>
+        <fieldset>
+            <label>
+                <input type="checkbox" name="smtp_ssl" {% if c.smtp_ssl %}checked{% endif %}>
+                Use SSL (port 465, implicit TLS)
+            </label>
+            <label>
+                <input type="checkbox" name="smtp_tls" {% if c.smtp_tls %}checked{% endif %}>
+                Use STARTTLS (port 587, upgrade to TLS)
+            </label>
+        </fieldset>
+        <div class="grid">
+            <label>
+                From Email
+                <input type="email" name="email_from" value="{{ c.email_from }}" placeholder="status@example.com">
+            </label>
+            <label>
+                From Name
+                <input type="text" name="email_from_name" value="{{ c.email_from_name }}" placeholder="KernelCI Status">
+            </label>
+        </div>
+        <button type="submit">Save Configuration</button>
+    </article>
+</form>
+
+<article>
+    <header><h3>Test Email</h3></header>
+    <p>Send a test email to all configured recipients to verify SMTP settings.</p>
+    <form method="post" action="/admin/configuration/test-email">
+        <button type="submit" class="outline">Send Test Email</button>
+    </form>
+</article>
+{% endblock %}

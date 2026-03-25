@@ -1,0 +1,46 @@
+<table role="grid">
+    <thead>
+        <tr>
+            <th>Time</th>
+            <th>Endpoint</th>
+            <th>State</th>
+            <th>Value</th>
+            <th>Message</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for e in entries %}
+        <tr>
+            <td>{{ e.timestamp }}</td>
+            <td>{{ e.endpoint_name }}</td>
+            <td>
+                {% if e.state == "OK" %}
+                <span class="badge badge-ok">OK</span>
+                {% else if e.state == "WARNING" %}
+                <span class="badge badge-warning">WARNING</span>
+                {% else if e.state == "CRITICAL" %}
+                <span class="badge badge-critical">CRITICAL</span>
+                {% else %}
+                <span class="badge badge-nodata">NO DATA</span>
+                {% endif %}
+            </td>
+            <td>{{ e.display_value }}</td>
+            <td>{{ e.display_message }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if total_pages > 1 %}
+<nav>
+    <ul>
+        {% if page > 1 %}
+        <li><a href="/admin/history?page={{ page - 1 }}{{ filter_query }}">&laquo; Previous</a></li>
+        {% endif %}
+        <li>Page {{ page }} of {{ total_pages }}</li>
+        {% if page < total_pages %}
+        <li><a href="/admin/history?page={{ page + 1 }}{{ filter_query }}">Next &raquo;</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}

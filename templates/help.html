@@ -1,0 +1,458 @@
+{% extends "base.html" %}
+
+{% block username %}{{ username }}{% endblock %}
+{% block title %}Help — KernelCI Status{% endblock %}
+
+{% block content %}
+<h2>Monitoring Guide</h2>
+
+<p>This daemon checks all configured endpoints every <b>15 minutes</b>. Each check produces a <b>value</b> (what was measured) and a <b>state</b> (OK, WARNING, CRITICAL, or NO_DATA). State changes trigger notifications via Discord, email, or text file.</p>
+
+<nav class="help-toc">
+    <b>Contents</b>
+    <ol>
+        <li><a href="#concepts">Core Concepts</a></li>
+        <li><a href="#http">HTTP / HTTPS Monitoring</a></li>
+        <li><a href="#prometheus">Prometheus Metrics</a></li>
+        <li><a href="#postgresql">PostgreSQL</a></li>
+        <li><a href="#kubernetes">Kubernetes</a></li>
+        <li><a href="#docker">Docker via SSH</a></li>
+        <li><a href="#conditions">Conditions &amp; Alerts</a></li>
+        <li><a href="#recipes">Real-World Recipes</a></li>
+    </ol>
+</nav>
+
+<!-- ─── Core Concepts ─── -->
+
+<article id="concepts">
+    <header><h3>Core Concepts</h3></header>
+    <p>Each monitored endpoint is defined by these fields:</p>
+    <table>
+        <tr>
+            <td><b>Name</b></td>
+            <td>Display name for the service (e.g. <code>KernelCI Production API</code>).</td>
+        </tr>
+        <tr>
+            <td><b>Sub-name</b></td>
+            <td>Optional label to distinguish multiple checks on the same service. Use sub-names like <code>HTTP</code>, <code>Latency</code>, <code>Cert</code>, <code>Disk Usage</code> when you monitor the same service in several ways.</td>
+        </tr>
+        <tr>
+            <td><b>Endpoint</b></td>
+            <td>The URL to check. The <b>URL scheme</b> determines the type of check — see sections below.</td>
+        </tr>
+        <tr>
+            <td><b>Selector</b></td>
+            <td>What to <b>measure</b> from the endpoint. Meaning depends on the check type. Leave empty for the default measurement.</td>
+        </tr>
+        <tr>
+            <td><b>Condition</b></td>
+            <td>Alert rule applied <b>after</b> measurement. If the value matches the condition, state worsens to WARNING. Leave empty for default behavior only.</td>
+        </tr>
+        <tr>
+            <td><b>Critical</b></td>
+            <td>Flag for production-critical services. These get <code>[CRITICAL]</code> prefix in notifications.</td>
+        </tr>
+        <tr>
+            <td><b>Enabled</b></td>
+            <td>Toggle monitoring on/off without deleting configuration.</td>
+        </tr>
+    </table>
+
+    <h4>States</h4>
+    <table>
+        <tr><td><span class="badge badge-ok">OK</span></td><td>Service is healthy. HTTP 2xx, connection succeeded, value within threshold.</td></tr>
+        <tr><td><span class="badge badge-warning">WARNING</span></td><td>Condition triggered, or a non-fatal issue (e.g. short uptime, cert expiring soon).</td></tr>
+        <tr><td><span class="badge badge-critical">CRITICAL</span></td><td>Service unreachable, HTTP 5xx, connection failed, check timed out (30s).</td></tr>
+        <tr><td><span class="badge badge-nodata">NO DATA</span></td><td>No checks have run yet, or the metric was not found.</td></tr>
+    </table>
+</article>
+
+<!-- ─── HTTP ─── -->
+
+<article id="http">
+    <header><h3>HTTP / HTTPS Monitoring</h3></header>
+    <p>Endpoint scheme: <code>https://</code> or <code>http://</code></p>
+
+    <p>Three kinds of checks depending on the <b>Selector</b>:</p>
+
+    <h4>1. Status code check (default)</h4>
+    <p>Leave Selector empty. The daemon makes a GET request and records the HTTP status code.</p>
+    <table>
+        <thead><tr><th>Name</th><th>Endpoint</th><th>Selector</th><th>Condition</th></tr></thead>
+        <tbody>
+            <tr><td>KernelCI API</td><td><code>https://api.kernelci.org</code></td><td>—</td><td>—</td></tr>
+            <tr><td>Dashboard</td><td><code>https://dashboard.kernelci.org</code></td><td>—</td><td>—</td></tr>
+        </tbody>
+    </table>
+    <p>State mapping: 2xx → OK, 5xx → CRITICAL, other → WARNING.</p>
+
+    <h4>2. Latency check</h4>
+    <p>Set Selector to <code>latency</code>. Records response time in milliseconds.</p>
+    <table>
+        <thead><tr><th>Name</th><th>Sub-name</th><th>Endpoint</th><th>Selector</th><th>Condition</th></tr></thead>
+        <tbody>
+            <tr><td>KernelCI API</td><td>Latency</td><td><code>https://api.kernelci.org</code></td><td><code>latency</code></td><td><code>&gt;500</code></td></tr>
+            <tr><td>Dashboard</td><td>Latency</td><td><code>https://dashboard.kernelci.org</code></td><td><code>latency</code></td><td><code>&gt;2000</code></td></tr>
+        </tbody>
+    </table>
+    <p>Combine with a condition like <code>&gt;500</code> to warn when response time exceeds 500ms.</p>
+
+    <h4>3. TLS certificate expiration</h4>
+    <p>Set Selector to <code>cert_expiration</code>. Connects via TLS, parses the leaf certificate, and records days until expiration.</p>
+    <table>
+        <thead><tr><th>Name</th><th>Sub-name</th><th>Endpoint</th><th>Selector</th><th>Condition</th></tr></thead>
+        <tbody>
+            <tr><td>Dashboard</td><td>Cert</td><td><code>https://dashboard.kernelci.org</code></td><td><code>cert_expiration</code></td><td><code>&lt;7</code></td></tr>
+            <tr><td>Grafana</td><td>Cert</td><td><code>https://grafana.kernelci.org</code></td><td><code>cert_expiration</code></td><td><code>&lt;14</code></td></tr>
+        </tbody>
+    </table>
+    <p>Built-in: WARNING if &lt; 7 days, CRITICAL if expired. Add <code>&lt;14</code> for earlier warning.</p>
+</article>
+
+<!-- ─── Prometheus ─── -->
+
+<article id="prometheus">
+    <header><h3>Prometheus Metrics</h3></header>
+    <p>Endpoint scheme: <code>promhttps://</code> or <code>promhttp://</code></p>
+
+    <p>Scrapes the <code>/metrics</code> endpoint directly on each service (not a Prometheus server). Parses the Prometheus text exposition format and extracts a specific metric value.</p>
+
+    <h4>Selector syntax</h4>
+    <pre><code>(metric_name)
+(metric_name,label=value)
+(metric_name,label1=value1,label2=value2)</code></pre>
+    <p>If Selector is empty, only checks that the metrics endpoint is reachable.</p>
+
+    <h4>Examples</h4>
+    <table>
+        <thead><tr><th>What to monitor</th><th>Endpoint</th><th>Selector</th><th>Condition</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>Disk usage %</td>
+                <td><code>promhttps://storage.kernelci.org</code></td>
+                <td><code>(node_filesystem_avail_bytes,mountpoint=/)</code></td>
+                <td><code>&lt;10000000000</code></td>
+            </tr>
+            <tr>
+                <td>Inode usage %</td>
+                <td><code>promhttps://storage.kernelci.org</code></td>
+                <td><code>(node_filesystem_files_free,mountpoint=/)</code></td>
+                <td><code>&lt;100000</code></td>
+            </tr>
+            <tr>
+                <td>HTTP request rate</td>
+                <td><code>promhttps://api.kernelci.org</code></td>
+                <td><code>(http_requests_total,status=500)</code></td>
+                <td><code>diff(12h)&gt;1000</code></td>
+            </tr>
+            <tr>
+                <td>Pipeline jobs pending</td>
+                <td><code>promhttps://pipeline.kernelci.org</code></td>
+                <td><code>(pipeline_jobs_pending)</code></td>
+                <td><code>&gt;100</code></td>
+            </tr>
+            <tr>
+                <td>Pipeline stalled</td>
+                <td><code>promhttps://pipeline.staging.kernelci.org</code></td>
+                <td><code>(pipeline_last_job_completed_timestamp)</code></td>
+                <td><code>diff(12h)==0</code></td>
+            </tr>
+            <tr>
+                <td>Nginx 5xx rate</td>
+                <td><code>promhttps://dashboard.kernelci.org:9113</code></td>
+                <td><code>(nginx_http_requests_total,status=5xx)</code></td>
+                <td><code>diff(12h)&gt;500</code></td>
+            </tr>
+            <tr>
+                <td>Memory usage</td>
+                <td><code>promhttps://storage.kernelci.org</code></td>
+                <td><code>(node_memory_MemAvailable_bytes)</code></td>
+                <td><code>&lt;1000000000</code></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>Tips</h4>
+    <ul>
+        <li>Use <code>diff(12h)&gt;N</code> to detect counter spikes — useful for error rates and request counters that only go up.</li>
+        <li>Use <code>diff(12h)==0</code> to detect stalled counters (e.g. pipeline stopped processing jobs).</li>
+        <li>Label filters are exact match. For multiple labels, separate with commas.</li>
+    </ul>
+</article>
+
+<!-- ─── PostgreSQL ─── -->
+
+<article id="postgresql">
+    <header><h3>PostgreSQL</h3></header>
+    <p>Endpoint scheme: <code>postgresql://user:password@host:port/database</code></p>
+
+    <p>Connects to the database and optionally runs a query. Connection failure → CRITICAL.</p>
+
+    <h4>Examples</h4>
+    <table>
+        <thead><tr><th>What to monitor</th><th>Endpoint</th><th>Selector</th><th>Condition</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>Basic up/down</td>
+                <td><code>postgresql://user:pass@db.kernelci.org/kcidb</code></td>
+                <td>—</td>
+                <td>—</td>
+            </tr>
+            <tr>
+                <td>Read-only check</td>
+                <td><code>postgresql://user:pass@db.kernelci.org/kcidb</code></td>
+                <td><code>SELECT pg_is_in_recovery()::int</code></td>
+                <td><code>==1</code></td>
+            </tr>
+            <tr>
+                <td>Table row count</td>
+                <td><code>postgresql://user:pass@db.kernelci.org/kcidb</code></td>
+                <td><code>SELECT count(*) FROM submissions WHERE created_at > now() - interval '1 hour'</code></td>
+                <td><code>==0</code></td>
+            </tr>
+            <tr>
+                <td>Replication lag</td>
+                <td><code>postgresql://user:pass@db.kernelci.org/kcidb</code></td>
+                <td><code>SELECT EXTRACT(EPOCH FROM replay_lag)::int FROM pg_stat_replication LIMIT 1</code></td>
+                <td><code>&gt;300</code></td>
+            </tr>
+            <tr>
+                <td>Active connections</td>
+                <td><code>postgresql://user:pass@db.kernelci.org/kcidb</code></td>
+                <td><code>SELECT count(*) FROM pg_stat_activity WHERE state = 'active'</code></td>
+                <td><code>&gt;50</code></td>
+            </tr>
+        </tbody>
+    </table>
+    <p>The Selector is the SQL query. The first column of the first row is the measured value. Leave empty for a simple <code>SELECT 1</code> connectivity check.</p>
+</article>
+
+<!-- ─── Kubernetes ─── -->
+
+<article id="kubernetes">
+    <header><h3>Kubernetes</h3></header>
+    <p>Endpoint scheme: <code>k8s://namespace</code> or <code>k8s://namespace/label=value</code></p>
+
+    <p>Connects via the system kubeconfig. Lists pods and checks their uptime. WARNING if any pod has been running for less than 30 minutes (may indicate crash-looping or recent restarts).</p>
+
+    <h4>Examples</h4>
+    <table>
+        <thead><tr><th>What to monitor</th><th>Endpoint</th><th>Selector</th><th>Condition</th><th>Notes</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>All production pods</td>
+                <td><code>k8s://production</code></td>
+                <td>—</td>
+                <td>—</td>
+                <td>All pods in <code>production</code> namespace</td>
+            </tr>
+            <tr>
+                <td>API pods only</td>
+                <td><code>k8s://production/app=api</code></td>
+                <td>—</td>
+                <td>—</td>
+                <td>Only pods with label <code>app=api</code></td>
+            </tr>
+            <tr>
+                <td>Pipeline workers</td>
+                <td><code>k8s://production/component=pipeline-worker</code></td>
+                <td>—</td>
+                <td>—</td>
+                <td>Filter by component label</td>
+            </tr>
+            <tr>
+                <td>Staging pods</td>
+                <td><code>k8s://staging</code></td>
+                <td>—</td>
+                <td>—</td>
+                <td>Staging namespace, non-critical</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>What it measures</h4>
+    <ul>
+        <li><b>Value</b>: total number of matching pods.</li>
+        <li><b>State</b>: WARNING if any pod uptime &lt; 30 minutes, OK otherwise.</li>
+        <li>The message lists which pods have low uptime, e.g. <code>api-7f8b9-xk2j4: uptime 3m</code>.</li>
+        <li>Uses the system kubeconfig (typically <code>~/.kube/config</code> or in-cluster credentials).</li>
+    </ul>
+
+    <h4>Monitoring pending pods via Prometheus</h4>
+    <p>To monitor the <b>number of pending pods</b> or <b>pod restart counts</b>, use Prometheus metrics from kube-state-metrics instead:</p>
+    <table>
+        <thead><tr><th>What</th><th>Endpoint</th><th>Selector</th><th>Condition</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>Pending pods</td>
+                <td><code>promhttps://kube-state-metrics:8080</code></td>
+                <td><code>(kube_pod_status_phase,phase=Pending,namespace=production)</code></td>
+                <td><code>&gt;0</code></td>
+            </tr>
+            <tr>
+                <td>Pod restarts</td>
+                <td><code>promhttps://kube-state-metrics:8080</code></td>
+                <td><code>(kube_pod_container_status_restarts_total,namespace=production,container=api)</code></td>
+                <td><code>diff(12h)&gt;5</code></td>
+            </tr>
+            <tr>
+                <td>Unavailable replicas</td>
+                <td><code>promhttps://kube-state-metrics:8080</code></td>
+                <td><code>(kube_deployment_status_replicas_unavailable,deployment=api)</code></td>
+                <td><code>&gt;0</code></td>
+            </tr>
+        </tbody>
+    </table>
+</article>
+
+<!-- ─── Docker ─── -->
+
+<article id="docker">
+    <header><h3>Docker via SSH</h3></header>
+    <p>Endpoint scheme: <code>ssh://user@host</code></p>
+
+    <p>SSHs into a remote host, runs <code>docker ps</code>, and parses container uptime. WARNING if any container has been running for less than 30 minutes. Uses the system SSH config (<code>~/.ssh/config</code>, keys, known_hosts).</p>
+
+    <h4>Examples</h4>
+    <table>
+        <thead><tr><th>What to monitor</th><th>Endpoint</th><th>Selector</th><th>Condition</th><th>Notes</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>All containers on host</td>
+                <td><code>ssh://deploy@storage.kernelci.org</code></td>
+                <td>—</td>
+                <td>—</td>
+                <td>Checks all running containers</td>
+            </tr>
+            <tr>
+                <td>Nginx only</td>
+                <td><code>ssh://deploy@storage.kernelci.org</code></td>
+                <td><code>nginx</code></td>
+                <td>—</td>
+                <td>Substring match on container name</td>
+            </tr>
+            <tr>
+                <td>Legacy storage</td>
+                <td><code>ssh://deploy@legacy-storage.kernelci.org</code></td>
+                <td><code>storage</code></td>
+                <td>—</td>
+                <td>Only containers with "storage" in name</td>
+            </tr>
+            <tr>
+                <td>KCIDB services</td>
+                <td><code>ssh://deploy@kcidb.kernelci.org</code></td>
+                <td><code>kcidb</code></td>
+                <td>—</td>
+                <td>All KCIDB-related containers</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h4>What it measures</h4>
+    <ul>
+        <li><b>Value</b>: number of matching running containers.</li>
+        <li><b>State</b>: WARNING if any container uptime &lt; 30 minutes, CRITICAL if SSH connection fails or <code>docker ps</code> errors.</li>
+        <li>The message lists containers with low uptime.</li>
+        <li>SSH must be pre-configured — the daemon uses the system SSH agent and <code>~/.ssh/config</code>.</li>
+    </ul>
+
+    <h4>Docker restart counts via Prometheus</h4>
+    <p>To monitor <b>container restart counts</b> rather than just current uptime, expose metrics with cAdvisor or a Docker exporter and use a Prometheus check:</p>
+    <table>
+        <thead><tr><th>What</th><th>Endpoint</th><th>Selector</th><th>Condition</th></tr></thead>
+        <tbody>
+            <tr>
+                <td>Container restarts</td>
+                <td><code>promhttps://storage.kernelci.org:9101</code></td>
+                <td><code>(container_restart_count,name=nginx)</code></td>
+                <td><code>diff(12h)&gt;3</code></td>
+            </tr>
+        </tbody>
+    </table>
+</article>
+
+<!-- ─── Conditions ─── -->
+
+<article id="conditions">
+    <header><h3>Conditions &amp; Alerts</h3></header>
+    <p>Conditions are applied <b>after</b> the checker runs. They can only make the state <b>worse</b> (never improve it). If a checker already returns CRITICAL, a condition cannot downgrade it to WARNING.</p>
+
+    <h4>Operators</h4>
+    <table>
+        <thead><tr><th>Condition</th><th>Triggers WARNING when</th><th>Example use case</th></tr></thead>
+        <tbody>
+            <tr><td><code>&gt;N</code></td><td>Value is greater than N</td><td><code>&gt;90</code> — disk usage above 90%</td></tr>
+            <tr><td><code>&lt;N</code></td><td>Value is less than N</td><td><code>&lt;7</code> — cert expires in less than 7 days</td></tr>
+            <tr><td><code>&gt;=N</code></td><td>Value is greater than or equal to N</td><td><code>&gt;=100</code> — connection pool full</td></tr>
+            <tr><td><code>&lt;=N</code></td><td>Value is less than or equal to N</td><td><code>&lt;=0</code> — no free space</td></tr>
+            <tr><td><code>==N</code></td><td>Value equals N</td><td><code>==1</code> — database in read-only mode</td></tr>
+            <tr><td><code>!=N</code></td><td>Value does not equal N</td><td><code>!=0</code> — error count is non-zero</td></tr>
+        </tbody>
+    </table>
+
+    <h4>Diff over time</h4>
+    <p>Compare the current value against a historical measurement:</p>
+    <pre><code>diff(12h)&gt;100    — warn if value grew by more than 100 in the last 12 hours
+diff(24h)&lt;-50    — warn if value dropped by more than 50 in 24 hours
+diff(12h)==0     — warn if value hasn't changed (stalled counter)</code></pre>
+    <p>The daemon looks up the value recorded approximately that many hours ago (±30 minute tolerance window) and computes <code>current - past</code>.</p>
+</article>
+
+<!-- ─── Recipes ─── -->
+
+<article id="recipes">
+    <header><h3>Real-World Recipes</h3></header>
+    <p>Common monitoring setups for a KernelCI deployment:</p>
+
+    <h4>Production API — full monitoring</h4>
+    <table>
+        <thead><tr><th>Name</th><th>Sub-name</th><th>Endpoint</th><th>Selector</th><th>Condition</th><th>Critical</th></tr></thead>
+        <tbody>
+            <tr><td>KernelCI API</td><td>HTTP</td><td><code>https://api.kernelci.org</code></td><td>—</td><td>—</td><td>Yes</td></tr>
+            <tr><td>KernelCI API</td><td>Latency</td><td><code>https://api.kernelci.org</code></td><td><code>latency</code></td><td><code>&gt;1000</code></td><td>Yes</td></tr>
+            <tr><td>KernelCI API</td><td>Cert</td><td><code>https://api.kernelci.org</code></td><td><code>cert_expiration</code></td><td><code>&lt;14</code></td><td>No</td></tr>
+            <tr><td>KernelCI API</td><td>Metrics</td><td><code>promhttps://api.kernelci.org</code></td><td><code>(http_requests_total,status=500)</code></td><td><code>diff(12h)&gt;100</code></td><td>Yes</td></tr>
+        </tbody>
+    </table>
+
+    <h4>Storage server — capacity monitoring</h4>
+    <table>
+        <thead><tr><th>Name</th><th>Sub-name</th><th>Endpoint</th><th>Selector</th><th>Condition</th></tr></thead>
+        <tbody>
+            <tr><td>Storage</td><td>HTTP</td><td><code>https://storage.kernelci.org</code></td><td>—</td><td>—</td></tr>
+            <tr><td>Storage</td><td>Disk Space</td><td><code>promhttps://storage.kernelci.org:9100</code></td><td><code>(node_filesystem_avail_bytes,mountpoint=/data)</code></td><td><code>&lt;50000000000</code></td></tr>
+            <tr><td>Storage</td><td>Inodes</td><td><code>promhttps://storage.kernelci.org:9100</code></td><td><code>(node_filesystem_files_free,mountpoint=/data)</code></td><td><code>&lt;100000</code></td></tr>
+            <tr><td>Storage</td><td>Docker</td><td><code>ssh://deploy@storage.kernelci.org</code></td><td>—</td><td>—</td></tr>
+        </tbody>
+    </table>
+
+    <h4>PostgreSQL database</h4>
+    <table>
+        <thead><tr><th>Name</th><th>Sub-name</th><th>Endpoint</th><th>Selector</th><th>Condition</th></tr></thead>
+        <tbody>
+            <tr><td>Azure PostgreSQL</td><td>Connection</td><td><code>postgresql://user:pass@db.kernelci.org/kcidb</code></td><td>—</td><td>—</td></tr>
+            <tr><td>Azure PostgreSQL</td><td>Submissions</td><td><code>postgresql://user:pass@db.kernelci.org/kcidb</code></td><td><code>SELECT count(*) FROM submissions WHERE created_at > now() - interval '1 hour'</code></td><td><code>==0</code></td></tr>
+        </tbody>
+    </table>
+
+    <h4>Kubernetes cluster</h4>
+    <table>
+        <thead><tr><th>Name</th><th>Sub-name</th><th>Endpoint</th><th>Selector</th><th>Condition</th></tr></thead>
+        <tbody>
+            <tr><td>K8s Production</td><td>All Pods</td><td><code>k8s://production</code></td><td>—</td><td>—</td></tr>
+            <tr><td>K8s Production</td><td>Pending Pods</td><td><code>promhttps://kube-state-metrics:8080</code></td><td><code>(kube_pod_status_phase,phase=Pending,namespace=production)</code></td><td><code>&gt;0</code></td></tr>
+            <tr><td>K8s Production</td><td>Restarts</td><td><code>promhttps://kube-state-metrics:8080</code></td><td><code>(kube_pod_container_status_restarts_total,namespace=production)</code></td><td><code>diff(12h)&gt;10</code></td></tr>
+        </tbody>
+    </table>
+
+    <h4>Staging — detect stalled pipeline</h4>
+    <table>
+        <thead><tr><th>Name</th><th>Sub-name</th><th>Endpoint</th><th>Selector</th><th>Condition</th></tr></thead>
+        <tbody>
+            <tr><td>Staging Pipeline</td><td>HTTP</td><td><code>https://pipeline.staging.kernelci.org</code></td><td>—</td><td>—</td></tr>
+            <tr><td>Staging Pipeline</td><td>Stalled</td><td><code>promhttps://pipeline.staging.kernelci.org</code></td><td><code>(pipeline_jobs_completed_total)</code></td><td><code>diff(12h)==0</code></td></tr>
+        </tbody>
+    </table>
+</article>
+
+{% endblock %}

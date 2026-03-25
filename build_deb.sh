@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Build a .deb package for Debian Bookworm inside Docker.
+# Usage: ./build_deb.sh
+# Output: ./output/kernelci-status_<version>_<arch>.deb
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+IMAGE="kernelci-status-builder-bookworm"
+OUTPUT_DIR="$(pwd)/output"
+
+mkdir -p "${OUTPUT_DIR}"
+
+echo "==> Building Docker image ..."
+docker build -f Dockerfile.bookworm -t "${IMAGE}" .
+
+echo "==> Building .deb package ..."
+docker run --rm -v "${OUTPUT_DIR}:/output" "${IMAGE}"
+
+echo "==> Package written to:"
+ls -lh "${OUTPUT_DIR}"/*.deb

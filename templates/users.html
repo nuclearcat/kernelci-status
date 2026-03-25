@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block username %}{{ username }}{% endblock %}
+{% block title %}Users — KernelCI Status{% endblock %}
+
+{% block content %}
+<h2>User Management</h2>
+
+<details>
+    <summary>Add New User</summary>
+    <form method="post" action="/admin/users/add">
+        <div class="grid">
+            <label>
+                Username
+                <input type="text" name="username" required>
+            </label>
+            <label>
+                Password
+                <input type="password" name="password" required>
+            </label>
+        </div>
+        <button type="submit">Add User</button>
+    </form>
+</details>
+
+<table role="grid">
+    <thead>
+        <tr>
+            <th>Username</th>
+            <th>Created</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u.username }}</td>
+            <td>{{ u.created_at }}</td>
+            <td>
+                <div class="action-group">
+                    <button class="btn-sm outline" onclick="this.closest('td').querySelector('.pw-form').toggleAttribute('hidden')">Change password</button>
+                    <form method="post" action="/admin/users/delete/{{ u.id }}" style="display:inline">
+                        <button type="submit" class="btn-sm outline secondary" onclick="return confirm('Delete user {{ u.username }}?')">Delete</button>
+                    </form>
+                </div>
+                <form method="post" action="/admin/users/password/{{ u.id }}" class="pw-form" hidden>
+                    <div class="inline-form">
+                        <input type="password" name="password" placeholder="New password" required class="input-sm">
+                        <button type="submit" class="btn-sm">Save</button>
+                        <button type="button" class="btn-sm outline secondary" onclick="this.closest('.pw-form').setAttribute('hidden','')">Cancel</button>
+                    </div>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

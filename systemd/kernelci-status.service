@@ -1,0 +1,23 @@
+[Unit]
+Description=KernelCI Status Monitoring Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=kernelci-status
+Group=kernelci-status
+ExecStart=/usr/local/bin/kernelci-status --config /etc/kernelci-status.toml
+WorkingDirectory=/var/lib/kernelci-status
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/kernelci-status
+ReadOnlyPaths=/etc/kernelci-status.toml
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

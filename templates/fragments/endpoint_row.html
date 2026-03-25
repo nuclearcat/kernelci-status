@@ -1,0 +1,39 @@
+<table role="grid">
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>Name</th>
+            <th>Endpoint</th>
+            <th>Value</th>
+            <th>Message</th>
+            <th>Last Check</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ep in endpoints %}
+        <tr>
+            <td>
+                {% if ep.state == "OK" %}
+                <span class="badge badge-ok">OK</span>
+                {% else if ep.state == "WARNING" %}
+                <span class="badge badge-warning">WARNING</span>
+                {% else if ep.state == "CRITICAL" %}
+                <span class="badge badge-critical">CRITICAL</span>
+                {% else %}
+                <span class="badge badge-nodata">NO DATA</span>
+                {% endif %}
+            </td>
+            <td>
+                <a href="/admin/endpoints/{{ ep.endpoint.id }}">
+                    {{ ep.endpoint.name }}{% if let Some(sub) = ep.endpoint.subname %} <small>({{ sub }})</small>{% endif %}
+                </a>
+                {% if ep.endpoint.critical %}<small> [critical]</small>{% endif %}
+            </td>
+            <td><code>{{ ep.endpoint.endpoint }}</code></td>
+            <td>{{ ep.value.as_deref().unwrap_or("-") }}</td>
+            <td>{{ ep.message.as_deref().unwrap_or("-") }}</td>
+            <td>{{ ep.last_check.as_deref().unwrap_or("never") }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

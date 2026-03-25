@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block username %}{{ username }}{% endblock %}
+{% block title %}History — KernelCI Status{% endblock %}
+
+{% block content %}
+<h2>State History</h2>
+
+<form hx-get="/admin/history" hx-target="#history-content" hx-push-url="true">
+    <div class="grid">
+        <label>
+            Endpoint
+            <select name="endpoint_id">
+                <option value="">All</option>
+                {% for ep in endpoints %}
+                <option value="{{ ep.id }}" {% if current_endpoint_id == ep.id %}selected{% endif %}>
+                    {{ ep.name }}{% if let Some(sub) = ep.subname %} ({{ sub }}){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            State
+            <select name="state">
+                <option value="">All</option>
+                <option value="OK" {% if current_state_str == "OK" %}selected{% endif %}>OK</option>
+                <option value="WARNING" {% if current_state_str == "WARNING" %}selected{% endif %}>Warning</option>
+                <option value="CRITICAL" {% if current_state_str == "CRITICAL" %}selected{% endif %}>Critical</option>
+                <option value="NO_DATA" {% if current_state_str == "NO_DATA" %}selected{% endif %}>No Data</option>
+            </select>
+        </label>
+        <label>
+            &nbsp;
+            <button type="submit">Filter</button>
+        </label>
+    </div>
+</form>
+
+<div id="history-content">
+{% include "fragments/history_table.html" %}
+</div>
+
+<form method="post" action="/admin/history/export" style="margin-top: 2rem;">
+    <button type="submit" class="outline">Export &amp; Delete Entries Older Than 2 Months</button>
+</form>
+{% endblock %}

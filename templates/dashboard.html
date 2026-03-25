@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block username %}{{ username }}{% endblock %}
+{% block title %}Dashboard — KernelCI Status{% endblock %}
+
+{% block content %}
+<h2>Dashboard</h2>
+
+<div class="grid">
+    <article>
+        <header>OK</header>
+        <p class="status-count ok">{{ ok_count }}</p>
+    </article>
+    <article>
+        <header>Warning</header>
+        <p class="status-count warning">{{ warning_count }}</p>
+    </article>
+    <article>
+        <header>Critical</header>
+        <p class="status-count critical">{{ critical_count }}</p>
+    </article>
+    <article>
+        <header>No Data</header>
+        <p class="status-count nodata">{{ nodata_count }}</p>
+    </article>
+</div>
+
+<div id="endpoint-table" hx-get="/admin" hx-trigger="every 60s" hx-swap="innerHTML">
+{% include "fragments/endpoint_row.html" %}
+</div>
+{% endblock %}

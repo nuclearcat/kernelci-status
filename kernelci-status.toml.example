@@ -1,0 +1,16 @@
+# KernelCI Status Monitoring Daemon configuration
+# Default path: /etc/kernelci-status.toml
+# All values shown below are the built-in defaults.
+
+[server]
+port = 2001
+
+[database]
+# Parent directory will be created automatically if it does not exist.
+path = "/var/lib/kernelci-status/status.db"
+
+[credentials]
+# Default user created on first startup when no users exist in the database.
+# Remove or comment out this section after initial setup.
+username = "admin"
+password = "changeme"

@@ -1,0 +1,74 @@
+[package]
+name = "kernelci-status"
+version = "0.1.2"
+edition = "2024"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Database
+rusqlite = { version = "0.37", features = ["bundled"] }
+tokio-rusqlite = "0.7"
+
+# Web framework
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["set-header"] }
+
+# Templates
+askama = "0.15"
+askama_web = { version = "0.15", features = ["axum-0.8"] }
+
+# HTTP client
+reqwest = { version = "0.12", features = ["rustls-tls", "json"], default-features = false }
+url = "2"
+
+# TLS cert inspection
+x509-parser = "0.17"
+tokio-rustls = "0.26"
+rustls = "0.23"
+webpki-roots = "1.0"
+rustls-pki-types = "1"
+
+# Prometheus parsing
+prometheus-parse = "0.2"
+
+# PostgreSQL
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
+
+# Kubernetes
+kube = { version = "0.99", features = ["runtime", "client", "derive"] }
+k8s-openapi = { version = "0.24", features = ["latest"] }
+
+# SSH
+openssh = "0.11"
+
+# Email
+lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder", "hostname"] }
+
+# Password hashing
+argon2 = "0.5"
+password-hash = { version = "0.5", features = ["getrandom"] }
+
+# Session tokens
+rand = "0.9"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Errors
+thiserror = "2"
+
+# Misc
+axum-extra = { version = "0.10", features = ["cookie"] }

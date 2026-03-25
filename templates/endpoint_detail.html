@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block username %}{{ username }}{% endblock %}
+{% block title %}{{ endpoint.name }} — KernelCI Status{% endblock %}
+
+{% block content %}
+<h2>{{ endpoint.name }}{% if let Some(sub) = endpoint.subname %} ({{ sub }}){% endif %}</h2>
+
+<article>
+    <header>Current Status</header>
+    <div class="grid">
+        <div>
+            <strong>State:</strong>
+            {% if current_state == "OK" %}
+            <span class="badge badge-ok">OK</span>
+            {% else if current_state == "WARNING" %}
+            <span class="badge badge-warning">WARNING</span>
+            {% else if current_state == "CRITICAL" %}
+            <span class="badge badge-critical">CRITICAL</span>
+            {% else %}
+            <span class="badge badge-nodata">NO DATA</span>
+            {% endif %}
+        </div>
+        <div><strong>Value:</strong> {{ current_value.as_deref().unwrap_or("-") }}</div>
+        <div><strong>Message:</strong> {{ current_message.as_deref().unwrap_or("-") }}</div>
+    </div>
+</article>
+
+<article>
+    <header>Configuration</header>
+    <table>
+        <tr><td><strong>Endpoint</strong></td><td><code>{{ endpoint.endpoint }}</code></td></tr>
+        <tr><td><strong>Selector</strong></td><td>{{ endpoint.selector.as_deref().unwrap_or("-") }}</td></tr>
+        <tr><td><strong>Condition</strong></td><td>{{ endpoint.condition.as_deref().unwrap_or("-") }}</td></tr>
+        <tr><td><strong>Critical</strong></td><td>{% if endpoint.critical %}Yes{% else %}No{% endif %}</td></tr>
+        <tr><td><strong>Enabled</strong></td><td>{% if endpoint.enabled %}Yes{% else %}No{% endif %}</td></tr>
+    </table>
+</article>
+
+<h3>Recent History</h3>
+<table role="grid">
+    <thead>
+        <tr>
+            <th>Time</th>
+            <th>State</th>
+            <th>Value</th>
+            <th>Message</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for h in history %}
+        <tr>
+            <td>{{ h.timestamp }}</td>
+            <td>
+                {% if h.state == "OK" %}
+                <span class="badge badge-ok">OK</span>
+                {% else if h.state == "WARNING" %}
+                <span class="badge badge-warning">WARNING</span>
+                {% else if h.state == "CRITICAL" %}
+                <span class="badge badge-critical">CRITICAL</span>
+                {% else %}
+                <span class="badge badge-nodata">NO DATA</span>
+                {% endif %}
+            </td>
+            <td>{{ h.value.as_deref().unwrap_or("-") }}</td>
+            <td>{{ h.message.as_deref().unwrap_or("-") }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

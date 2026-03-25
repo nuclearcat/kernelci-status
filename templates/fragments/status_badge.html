@@ -1,0 +1,9 @@
+{% if state == "OK" %}
+<span class="badge badge-ok">OK</span>
+{% else if state == "WARNING" %}
+<span class="badge badge-warning">WARNING</span>
+{% else if state == "CRITICAL" %}
+<span class="badge badge-critical">CRITICAL</span>
+{% else %}
+<span class="badge badge-nodata">NO DATA</span>
+{% endif %}

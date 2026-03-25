@@ -1,0 +1,8 @@
+target/
+output/
+pkg/
+status.db
+status.db-shm
+status.db-wal
+*.deb
+.git/

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block username %}{{ username }}{% endblock %}
+{% block title %}Notifications — KernelCI Status{% endblock %}
+
+{% block content %}
+<h2>Notifications</h2>
+
+{% if !error.is_empty() %}
+<div class="error-message">{{ error }}</div>
+{% endif %}
+{% if !success.is_empty() %}
+<div class="success-message">{{ success }}</div>
+{% endif %}
+
+<form method="post" action="/admin/notifications">
+    <article>
+        <header><h3>Email Notifications</h3></header>
+        <label>
+            <input type="checkbox" name="email_enabled" {% if c.email_enabled %}checked{% endif %}>
+            Enable email notifications
+        </label>
+        <label>
+            Recipient Email Addresses
+            <input type="text" name="email_to" value="{{ c.email_to }}"
+                   placeholder="admin@example.com, ops@example.com">
+            <small>Comma-separated list of email addresses that will receive status change alerts.</small>
+        </label>
+    </article>
+
+    <article>
+        <header><h3>Discord</h3></header>
+        <label>
+            <input type="checkbox" name="discord_enabled" {% if c.discord_enabled %}checked{% endif %}>
+            Enable Discord notifications
+        </label>
+        <label>
+            Webhook URL
+            <input type="text" name="discord_webhook_url" value="{{ c.discord_webhook_url }}" placeholder="https://discord.com/api/webhooks/...">
+        </label>
+    </article>
+
+    <article>
+        <header><h3>Text File</h3></header>
+        <label>
+            <input type="checkbox" name="textfile_enabled" {% if c.textfile_enabled %}checked{% endif %}>
+            Enable text file logging
+        </label>
+        <label>
+            File Path
+            <input type="text" name="textfile_path" value="{{ c.textfile_path }}" placeholder="/var/log/kernelci-status/alerts.log">
+        </label>
+    </article>
+
+    <button type="submit">Save Settings</button>
+</form>
+{% endblock %}

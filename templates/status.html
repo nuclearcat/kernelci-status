@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KernelCI Status</title>
+    <link rel="stylesheet" href="/static/pico.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/htmx.min.js"></script>
+</head>
+<body>
+    <main class="container">
+        <div class="status-page-header">
+            <h1>KernelCI Service Status</h1>
+        </div>
+
+        <div id="status-data"
+             hx-get="/status/data"
+             hx-trigger="load, every 60s"
+             hx-swap="innerHTML"
+             hx-indicator="#loading-spinner">
+
+            <div id="loading-spinner" class="status-spinner htmx-indicator">
+                <div class="spinner"></div>
+                <p>Loading status data&hellip;</p>
+            </div>
+        </div>
+
+        <footer class="status-footer">
+            <p>Refreshes automatically every 60 seconds &middot; <a href="/admin">Admin</a></p>
+            <p>&copy; {{ year }} <a href="https://kernelci.org">KernelCI</a> &mdash; Linux Kernel Continuous Integration</p>
+        </footer>
+    </main>
+</body>
+</html>

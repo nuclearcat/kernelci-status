@@ -1,0 +1,31 @@
+<form method="post" action="/configuration/add">
+    <div class="grid">
+        <label>
+            Name
+            <input type="text" name="name" required>
+        </label>
+        <label>
+            Sub-name
+            <input type="text" name="subname">
+        </label>
+    </div>
+    <label>
+        Endpoint URL
+        <input type="text" name="endpoint" required>
+    </label>
+    <div class="grid">
+        <label>
+            Selector
+            <input type="text" name="selector">
+        </label>
+        <label>
+            Condition
+            <input type="text" name="condition">
+        </label>
+    </div>
+    <fieldset>
+        <label><input type="checkbox" name="critical"> Critical</label>
+        <label><input type="checkbox" name="enabled" checked> Enabled</label>
+    </fieldset>
+    <button type="submit">Add</button>
+</form>
