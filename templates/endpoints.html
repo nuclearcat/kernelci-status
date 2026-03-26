@@ -71,21 +71,52 @@
             <td>{% if ep.critical %}Yes{% else %}No{% endif %}</td>
             <td>{% if ep.enabled %}Yes{% else %}No{% endif %}</td>
             <td>
-                <details>
-                    <summary>Edit</summary>
-                    <form method="post" action="/admin/endpoints/edit/{{ ep.id }}">
-                        <input type="text" name="name" value="{{ ep.name }}" required>
-                        <input type="text" name="subname" value="{{ ep.subname.as_deref().unwrap_or("") }}">
+                <div class="action-group">
+                    <button type="button" class="outline btn-sm" onclick="let r=this.closest('tr').nextElementSibling; r.hidden=!r.hidden">Edit</button>
+                    <form method="post" action="/admin/endpoints/clone/{{ ep.id }}" style="display:inline">
+                        <button type="submit" class="outline btn-sm">Clone</button>
+                    </form>
+                    <form method="post" action="/admin/endpoints/delete/{{ ep.id }}" style="display:inline">
+                        <button type="submit" class="outline secondary btn-sm" onclick="return confirm('Delete this endpoint?')">Delete</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        <tr hidden>
+            <td colspan="7" class="edit-row">
+                <form method="post" action="/admin/endpoints/edit/{{ ep.id }}">
+                    <div class="grid">
+                        <label>
+                            Name
+                            <input type="text" name="name" value="{{ ep.name }}" required>
+                        </label>
+                        <label>
+                            Sub-name
+                            <input type="text" name="subname" value="{{ ep.subname.as_deref().unwrap_or("") }}">
+                        </label>
+                    </div>
+                    <label>
+                        Endpoint URL
                         <input type="text" name="endpoint" value="{{ ep.endpoint }}" required>
-                        <input type="text" name="selector" value="{{ ep.selector.as_deref().unwrap_or("") }}">
-                        <input type="text" name="condition" value="{{ ep.condition.as_deref().unwrap_or("") }}">
+                    </label>
+                    <div class="grid">
+                        <label>
+                            Selector
+                            <input type="text" name="selector" value="{{ ep.selector.as_deref().unwrap_or("") }}">
+                        </label>
+                        <label>
+                            Condition
+                            <input type="text" name="condition" value="{{ ep.condition.as_deref().unwrap_or("") }}">
+                        </label>
+                    </div>
+                    <fieldset>
                         <label><input type="checkbox" name="critical" {% if ep.critical %}checked{% endif %}> Critical</label>
                         <label><input type="checkbox" name="enabled" {% if ep.enabled %}checked{% endif %}> Enabled</label>
-                        <button type="submit">Save</button>
-                    </form>
-                </details>
-                <form method="post" action="/admin/endpoints/delete/{{ ep.id }}" style="display:inline">
-                    <button type="submit" class="outline secondary" onclick="return confirm('Delete this endpoint?')">Delete</button>
+                    </fieldset>
+                    <div class="action-group">
+                        <button type="submit" class="btn-sm">Save</button>
+                        <button type="button" class="outline btn-sm" onclick="this.closest('tr').hidden=true">Cancel</button>
+                    </div>
                 </form>
             </td>
         </tr>

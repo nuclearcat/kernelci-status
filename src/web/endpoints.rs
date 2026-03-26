@@ -93,6 +93,32 @@ pub async fn edit_endpoint(
     Ok(Redirect::to("/admin/endpoints"))
 }
 
+pub async fn clone_endpoint(
+    State(state): State<AppState>,
+    _user: AuthUser,
+    Path(id): Path<i64>,
+) -> Result<impl IntoResponse, AppError> {
+    let db = state.db.clone();
+    db.call(move |conn| {
+        let ep = crate::db::endpoints::get_by_id(conn, id)?
+            .ok_or_else(|| rusqlite::Error::QueryReturnedNoRows)?;
+        let new = NewEndpoint {
+            name: ep.name,
+            subname: ep.subname,
+            endpoint: ep.endpoint,
+            selector: ep.selector,
+            condition: ep.condition,
+            critical: ep.critical,
+            enabled: false,
+        };
+        crate::db::endpoints::insert(conn, &new)?;
+        Ok(())
+    })
+    .await?;
+
+    Ok(Redirect::to("/admin/endpoints"))
+}
+
 pub async fn delete_endpoint(
     State(state): State<AppState>,
     _user: AuthUser,

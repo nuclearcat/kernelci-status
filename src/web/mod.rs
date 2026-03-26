@@ -19,6 +19,7 @@ use crate::state::AppState;
 static HTMX_JS: &[u8] = include_bytes!("../../static/htmx.min.js");
 static PICO_CSS: &[u8] = include_bytes!("../../static/pico.min.css");
 static STYLE_CSS: &[u8] = include_bytes!("../../static/style.css");
+static LOGO_SVG: &[u8] = include_bytes!("../../static/kernelci-horizontal-color-1.svg");
 
 async fn serve_htmx() -> impl IntoResponse {
     ([(header::CONTENT_TYPE, "application/javascript")], HTMX_JS)
@@ -30,6 +31,10 @@ async fn serve_pico() -> impl IntoResponse {
 
 async fn serve_style() -> impl IntoResponse {
     ([(header::CONTENT_TYPE, "text/css")], STYLE_CSS)
+}
+
+async fn serve_logo() -> impl IntoResponse {
+    ([(header::CONTENT_TYPE, "image/svg+xml")], LOGO_SVG)
 }
 
 pub fn router(state: AppState) -> Router {
@@ -59,6 +64,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/admin/endpoints/edit/{id}",
             axum::routing::post(endpoints::edit_endpoint),
+        )
+        .route(
+            "/admin/endpoints/clone/{id}",
+            axum::routing::post(endpoints::clone_endpoint),
         )
         .route(
             "/admin/endpoints/delete/{id}",
@@ -107,6 +116,7 @@ pub fn router(state: AppState) -> Router {
         .route("/static/htmx.min.js", axum::routing::get(serve_htmx))
         .route("/static/pico.min.css", axum::routing::get(serve_pico))
         .route("/static/style.css", axum::routing::get(serve_style))
+        .route("/static/kernelci-horizontal-color-1.svg", axum::routing::get(serve_logo))
         // API routes
         .nest("/api", crate::api::router())
         .layer(SetResponseHeaderLayer::overriding(

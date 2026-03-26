@@ -11,7 +11,13 @@
 <body>
     <main class="container">
         <div class="status-page-header">
-            <h1>KernelCI Service Status</h1>
+            <img src="/static/kernelci-horizontal-color-1.svg" alt="KernelCI" class="status-logo">
+            <h1>Service Status</h1>
+        </div>
+
+        <div id="loading-spinner" class="status-spinner htmx-indicator">
+            <div class="spinner"></div>
+            <p>Loading status data&hellip;</p>
         </div>
 
         <div id="status-data"
@@ -19,11 +25,6 @@
              hx-trigger="load, every 60s"
              hx-swap="innerHTML"
              hx-indicator="#loading-spinner">
-
-            <div id="loading-spinner" class="status-spinner htmx-indicator">
-                <div class="spinner"></div>
-                <p>Loading status data&hellip;</p>
-            </div>
         </div>
 
         <footer class="status-footer">

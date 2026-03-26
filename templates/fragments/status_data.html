@@ -4,34 +4,62 @@
     </div>
 </div>
 
+<div class="range-toggle">
+    <button class="range-btn{% if active_range == "24h" %} active{% endif %}"
+            hx-get="/status/data?range=24h" hx-target="#status-data" hx-swap="innerHTML"
+            hx-indicator="#loading-spinner">24h</button>
+    <button class="range-btn{% if active_range == "7d" %} active{% endif %}"
+            hx-get="/status/data?range=7d" hx-target="#status-data" hx-swap="innerHTML"
+            hx-indicator="#loading-spinner">7d</button>
+    <button class="range-btn{% if active_range == "30d" %} active{% endif %}"
+            hx-get="/status/data?range=30d" hx-target="#status-data" hx-swap="innerHTML"
+            hx-indicator="#loading-spinner">30d</button>
+</div>
+
 <div class="status-list">
-    {% for svc in services %}
+    {% for grp in groups %}
     <div class="status-row">
         <div class="status-row-header">
             <div class="status-row-name">
-                <span class="status-dot dot-{{ svc.current_state_css }}"></span>
-                <strong>{{ svc.name }}</strong>
-                {% if !svc.subname.is_empty() %}
-                <small class="subname">{{ svc.subname }}</small>
+                <span class="status-dot dot-{{ grp.current_state_css }}"></span>
+                {% if grp.expandable %}
+                <button class="expand-toggle" onclick="this.closest('.status-row').classList.toggle('expanded')" aria-label="Toggle details">
+                    <span class="expand-arrow">&#9654;</span>
+                </button>
+                {% endif %}
+                <strong>{{ grp.name }}</strong>
+                {% if !grp.expandable %}
+                    {% if let Some(check) = grp.checks.first() %}
+                        {% if !check.subname.is_empty() %}
+                        <small class="subname">{{ check.subname }}</small>
+                        {% endif %}
+                    {% endif %}
                 {% endif %}
             </div>
             <div class="status-row-uptime">
-                {{ svc.uptime_pct }} uptime
+                {{ grp.uptime_pct }} uptime
             </div>
         </div>
         <div class="timeline-bar">
-            {% for slot in svc.timeline %}
+            {% for slot in grp.timeline %}
             <div class="timeline-slot {{ slot.css_class }}" title="{{ slot.title }}"></div>
             {% endfor %}
         </div>
-        <div class="timeline-labels">
-            <span>24h ago</span>
-            <span>Now</span>
+        {% if grp.expandable %}
+        <div class="checks-detail">
+            {% for check in grp.checks %}
+            <div class="check-row">
+                <span class="status-dot dot-{{ check.current_state_css }}"></span>
+                <span class="check-name">{{ check.subname }}</span>
+                <span class="badge badge-{{ check.current_state_css }}">{{ check.current_state }}</span>
+            </div>
+            {% endfor %}
         </div>
+        {% endif %}
     </div>
     {% endfor %}
 </div>
 
-{% if services.is_empty() %}
+{% if groups.is_empty() %}
 <p class="status-empty">No monitored services configured.</p>
 {% endif %}

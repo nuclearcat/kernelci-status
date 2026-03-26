@@ -43,6 +43,21 @@
 a { color: var(--kci-blue-dark); }
 a:hover { color: var(--kci-navy); }
 
+/* ── Logo ── */
+
+.status-logo {
+    height: 32px;
+    width: auto;
+    margin-bottom: 0.25rem;
+}
+
+.nav-logo {
+    height: 24px;
+    width: auto;
+    display: block;
+    filter: brightness(0) invert(1);
+}
+
 /* ── Admin nav bar ── */
 
 nav.admin-nav {
@@ -262,6 +277,8 @@ code {
     border-radius: 4px;
     margin: 0;
     cursor: pointer;
+    width: auto;
+    display: inline-block;
 }
 
 .btn-sm.outline {
@@ -316,6 +333,35 @@ code {
     height: auto;
     margin: 0;
     width: 160px;
+}
+
+/* ── Inline edit row ── */
+
+.edit-row {
+    background: var(--kci-blue-light);
+    padding: 1rem 1.25rem;
+}
+
+.edit-row form {
+    margin: 0;
+}
+
+.edit-row label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--kci-text);
+}
+
+.edit-row input[type="text"] {
+    font-size: 0.85rem;
+    padding: 0.35rem 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.edit-row fieldset {
+    margin-bottom: 0.5rem;
+    padding: 0;
+    border: none;
 }
 
 /* ── Tables ── */
@@ -384,20 +430,20 @@ article[id] pre code {
 
 .status-page-header {
     text-align: center;
-    margin: 2.5rem 0 1.5rem;
+    margin: 1rem 0 0.75rem;
 }
 
 .status-page-header h1 {
     color: var(--kci-navy);
-    font-size: 1.6rem;
+    font-size: 1.25rem;
     font-weight: 700;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.4rem;
 }
 
 .overall-banner {
-    padding: 0.6rem 1.5rem;
-    border-radius: 6px;
-    font-size: 0.95rem;
+    padding: 0.35rem 1.25rem;
+    border-radius: 5px;
+    font-size: 0.85rem;
     font-weight: 600;
     display: inline-block;
 }
@@ -418,6 +464,43 @@ article[id] pre code {
 }
 
 /* Service rows */
+/* ── Range toggle ── */
+
+.range-toggle {
+    display: flex;
+    justify-content: center;
+    gap: 2px;
+    margin-bottom: 0.75rem;
+}
+
+.range-btn {
+    background: var(--kci-bg);
+    border: 1px solid var(--kci-border);
+    padding: 0.2rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--kci-text-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    width: auto;
+    display: inline-block;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.range-btn:first-child { border-radius: 4px 0 0 4px; }
+.range-btn:last-child { border-radius: 0 4px 4px 0; }
+
+.range-btn.active {
+    background: var(--kci-navy);
+    color: #fff;
+    border-color: var(--kci-navy);
+}
+
+.range-btn:hover:not(.active) {
+    background: var(--kci-gray);
+}
+
 .status-list {
     display: flex;
     flex-direction: column;
@@ -427,7 +510,7 @@ article[id] pre code {
 .status-row {
     border: 1px solid var(--kci-border);
     border-bottom: none;
-    padding: 0.9rem 1.25rem 0.4rem;
+    padding: 0.5rem 1rem 0.3rem;
     background: #fff;
 }
 
@@ -449,17 +532,17 @@ article[id] pre code {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.2rem;
 }
 
 .status-row-name {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
 }
 
 .status-row-name strong {
-    font-size: 0.95rem;
+    font-size: 0.88rem;
     color: var(--kci-text);
 }
 
@@ -469,7 +552,7 @@ article[id] pre code {
 }
 
 .status-row-uptime {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: var(--kci-text-muted);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
@@ -478,8 +561,8 @@ article[id] pre code {
 /* Colored dot */
 .status-dot {
     display: inline-block;
-    width: 9px;
-    height: 9px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
 }
@@ -493,8 +576,8 @@ article[id] pre code {
 .timeline-bar {
     display: flex;
     gap: 1px;
-    height: 24px;
-    border-radius: 3px;
+    height: 18px;
+    border-radius: 2px;
     overflow: hidden;
 }
 
@@ -515,24 +598,68 @@ article[id] pre code {
 .slot-critical { background: var(--kci-red); }
 .slot-nodata { background: var(--kci-gray); }
 
-.timeline-labels {
-    display: flex;
-    justify-content: space-between;
+/* .timeline-labels removed — replaced by global range toggle */
+
+/* ── Expand/collapse checks ── */
+
+.expand-toggle {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    line-height: 1;
     font-size: 0.7rem;
     color: var(--kci-text-muted);
-    margin-top: 2px;
-    margin-bottom: 0;
+    transition: transform 0.15s;
+}
+
+.expand-arrow {
+    display: inline-block;
+    transition: transform 0.15s;
+}
+
+.status-row.expanded .expand-arrow {
+    transform: rotate(90deg);
+}
+
+.checks-detail {
+    display: none;
+    margin-top: 0.5rem;
+    padding: 0.4rem 0 0.2rem 1.4rem;
+    border-top: 1px solid var(--kci-gray);
+}
+
+.status-row.expanded .checks-detail {
+    display: block;
+}
+
+.check-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0;
+    font-size: 0.85rem;
+}
+
+.check-name {
+    color: var(--kci-text);
+    flex: 1;
 }
 
 /* ── Status page footer ── */
 
 .status-footer {
     text-align: center;
-    margin-top: 2.5rem;
-    padding-top: 1.5rem;
+    margin-top: 1.25rem;
+    padding-top: 0.75rem;
     border-top: 1px solid var(--kci-gray);
     color: var(--kci-text-muted);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
+}
+
+.status-footer p {
+    margin-bottom: 0.25rem;
 }
 
 .status-footer a {
@@ -552,11 +679,14 @@ article[id] pre code {
 /* ── Loading spinner ── */
 
 .status-spinner {
-    display: flex;
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.7);
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 4rem 0;
+    z-index: 999;
     color: var(--kci-text-muted);
     font-size: 0.95rem;
 }
@@ -577,9 +707,9 @@ article[id] pre code {
 
 /* HTMX indicator: hidden by default, shown when request in flight */
 .htmx-indicator {
-    display: none;
+    display: none !important;
 }
 .htmx-request .htmx-indicator,
 .htmx-request.htmx-indicator {
-    display: flex;
+    display: flex !important;
 }

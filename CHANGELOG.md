@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.3
+
+### Added
+- KernelCI logo on public status page header and admin nav bar
+- Service grouping: endpoints with the same name are merged into a single row with aggregated worst-state timeline
+- Expandable group rows: click to reveal individual check statuses when a group has multiple checks
+- Time range selector (24h / 7d / 30d) on public status page, replaces per-row "24h ago" labels
+- Clone button on Endpoints page (creates a disabled copy for quick duplication)
+- Inline edit form for endpoints with labeled fields, opens below the row
+
+### Changed
+- Uptime calculation now uses raw check entries instead of slot-based aggregation; consistent across all time ranges
+- Group uptime = minimum of per-endpoint uptimes (service requires all checks passing)
+- Uptime precision increased to 2 decimal places
+- Warnings no longer count against uptime (only CRITICAL reduces it)
+- Loading spinner is now a full-screen overlay instead of inline (no layout shift)
+- Compact vertical layout on status page: tighter header, rows, timeline bars, and footer
+- Delete button on Endpoints page uses small inline styling instead of full-width
+
 ## 0.1.2
 
 ### Added
