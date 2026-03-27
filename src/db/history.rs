@@ -233,6 +233,25 @@ pub fn get_last_hours(
     rows.collect()
 }
 
+/// Get all history entries for an endpoint since a given timestamp.
+/// The caller supplies the exact cutoff so that the DB query and the
+/// slot-mapping logic share the same time reference (prevents stale
+/// NO_DATA slots during HTMX refreshes).
+pub fn get_since(
+    conn: &Connection,
+    endpoint_id: i64,
+    since: &str,
+) -> rusqlite::Result<Vec<HistoryEntry>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, endpoint_id, timestamp, value, state, message
+         FROM state_history
+         WHERE endpoint_id = ?1 AND timestamp >= ?2
+         ORDER BY timestamp ASC",
+    )?;
+    let rows = stmt.query_map(params![endpoint_id, since], map_row)?;
+    rows.collect()
+}
+
 fn map_row(row: &rusqlite::Row) -> rusqlite::Result<HistoryEntry> {
     Ok(HistoryEntry {
         id: row.get(0)?,

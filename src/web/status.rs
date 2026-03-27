@@ -106,7 +106,24 @@ pub async fn status_data(
     let groups: Vec<ServiceGroup> = db
         .call(move |conn| {
             let endpoints = crate::db::endpoints::list_all(conn)?;
-            let now = chrono::Utc::now();
+
+            // Align `now` to the next slot boundary so that slot edges are
+            // stable across consecutive HTMX refreshes.  Without this,
+            // each 60-second refresh shifts all 96 boundaries, which can
+            // move a lone entry (common right after an outage) into the
+            // neighbouring slot, leaving the original slot as NO_DATA.
+            let raw_now = chrono::Utc::now();
+            let slot_secs = slot_minutes * 60;
+            let ts = raw_now.timestamp();
+            let remainder = ts % slot_secs;
+            let aligned_ts = if remainder == 0 { ts } else { ts + slot_secs - remainder };
+            let now = chrono::DateTime::from_timestamp(aligned_ts, 0)
+                .unwrap_or(raw_now);
+
+            // Use the same aligned start for the DB query so that the
+            // returned entries exactly match the slot-mapping window.
+            let start = now - chrono::Duration::hours(hours);
+            let start_str = start.format("%Y-%m-%d %H:%M:%S").to_string();
 
             // Collect per-endpoint data, grouped by name (BTreeMap for stable order).
             let mut by_name: BTreeMap<String, Vec<EndpointData>> = BTreeMap::new();
@@ -115,7 +132,7 @@ pub async fn status_data(
                 if !ep.enabled {
                     continue;
                 }
-                let entries = crate::db::history::get_last_hours(conn, ep.id, hours)?;
+                let entries = crate::db::history::get_since(conn, ep.id, &start_str)?;
                 let latest = crate::db::history::get_latest_for_endpoint(conn, ep.id)?;
 
                 let current_state = latest
