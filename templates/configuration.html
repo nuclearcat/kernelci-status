@@ -25,7 +25,14 @@
             <label>
                 Retries on Failure
                 <input type="number" name="check_retries" value="{{ c.check_retries }}" placeholder="3" min="0" max="10">
-                <small>Number of retries before marking an endpoint as down. Default: 3.</small>
+                <small>Number of retries before marking an endpoint as down (Critical). Default: 3.</small>
+            </label>
+        </div>
+        <div class="grid">
+            <label>
+                Retries on Warning
+                <input type="number" name="warning_retries" value="{{ c.warning_retries }}" placeholder="3" min="0" max="10">
+                <small>Number of retries before marking an endpoint as warning. Default: 3.</small>
             </label>
         </div>
     </article>

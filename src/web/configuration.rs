@@ -12,6 +12,7 @@ use crate::state::AppState;
 pub struct AppConfigView {
     pub check_interval: String,
     pub check_retries: String,
+    pub warning_retries: String,
     pub smtp_host: String,
     pub smtp_port: String,
     pub smtp_username: String,
@@ -30,6 +31,7 @@ impl AppConfigView {
         Self {
             check_interval: g("check_interval", "5"),
             check_retries: g("check_retries", "3"),
+            warning_retries: g("warning_retries", "3"),
             smtp_host: g("smtp_host", ""),
             smtp_port: g("smtp_port", "587"),
             smtp_username: g("smtp_username", ""),
@@ -73,6 +75,7 @@ pub async fn configuration_page(
 pub struct ConfigurationForm {
     pub check_interval: Option<String>,
     pub check_retries: Option<String>,
+    pub warning_retries: Option<String>,
     pub smtp_host: Option<String>,
     pub smtp_port: Option<String>,
     pub smtp_username: Option<String>,
@@ -147,6 +150,35 @@ pub async fn save_configuration(
         ));
     }
 
+    let warning_retries_str = form.warning_retries.clone().unwrap_or_else(|| "3".to_string());
+    if let Ok(v) = warning_retries_str.parse::<u32>() {
+        if v > 10 {
+            let config = load_config(&state).await?;
+            return Ok(Html(
+                ConfigurationTemplate {
+                    username: user.username,
+                    c: AppConfigView::from_map(&config),
+                    error: "Warning retries must be between 0 and 10.".to_string(),
+                    success: String::new(),
+                }
+                .render()
+                .unwrap_or_default(),
+            ));
+        }
+    } else if !warning_retries_str.is_empty() {
+        let config = load_config(&state).await?;
+        return Ok(Html(
+            ConfigurationTemplate {
+                username: user.username,
+                c: AppConfigView::from_map(&config),
+                error: "Warning retries must be a number.".to_string(),
+                success: String::new(),
+            }
+            .render()
+            .unwrap_or_default(),
+        ));
+    }
+
     // Validate from email if provided
     let from_email = form.email_from.as_deref().unwrap_or("").trim().to_string();
     if !from_email.is_empty() && !is_valid_email(&from_email) {
@@ -197,6 +229,7 @@ pub async fn save_configuration(
 
         set("check_interval", &interval_str)?;
         set("check_retries", &retries_str)?;
+        set("warning_retries", &warning_retries_str)?;
         set("smtp_host", form.smtp_host.as_deref().unwrap_or(""))?;
         set("smtp_port", &port_str)?;
         set("smtp_username", form.smtp_username.as_deref().unwrap_or(""))?;

@@ -15,8 +15,11 @@ const MAX_CONCURRENT_CHECKS: usize = 20;
 /// Per-check timeout.
 const CHECK_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Default retries on failure.
+/// Default retries on failure (Critical / NoData).
 const DEFAULT_RETRIES: u32 = 3;
+
+/// Default retries on warning.
+const DEFAULT_WARNING_RETRIES: u32 = 3;
 
 /// Delay between retries.
 const RETRY_DELAY: Duration = Duration::from_secs(5);
@@ -33,16 +36,25 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
         return Ok(());
     }
 
-    let max_retries = {
+    let (max_retries, max_warning_retries) = {
         let cache = state.config_cache.read().await;
-        cache
+        let r = cache
             .get("check_retries")
             .and_then(|v| v.parse::<u32>().ok())
             .filter(|&v| v <= 10)
-            .unwrap_or(DEFAULT_RETRIES)
+            .unwrap_or(DEFAULT_RETRIES);
+        let w = cache
+            .get("warning_retries")
+            .and_then(|v| v.parse::<u32>().ok())
+            .filter(|&v| v <= 10)
+            .unwrap_or(DEFAULT_WARNING_RETRIES);
+        (r, w)
     };
 
-    info!("Checking {} endpoints (retries: {max_retries})", endpoints.len());
+    info!(
+        "Checking {} endpoints (retries: {max_retries}, warning retries: {max_warning_retries})",
+        endpoints.len()
+    );
 
     let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_CHECKS));
     let mut join_set = JoinSet::new();
@@ -59,15 +71,20 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
 
             let mut result = run_check_with_timeout(&ep, &ctx).await;
 
-            // Retry on non-OK state
-            if result.state != EndpointState::Ok && max_retries > 0 {
-                for attempt in 1..=max_retries {
+            // Retry on non-OK state (separate retry counts for warnings vs critical)
+            let retries_for_state = match result.state {
+                EndpointState::Ok => 0,
+                EndpointState::Warning => max_warning_retries,
+                _ => max_retries,
+            };
+            if retries_for_state > 0 {
+                for attempt in 1..=retries_for_state {
                     tokio::time::sleep(RETRY_DELAY).await;
                     let retry = run_check_with_timeout(&ep, &ctx).await;
                     if retry.state == EndpointState::Ok {
                         info!(
                             "Endpoint {} recovered on retry {}/{}",
-                            ep.name, attempt, max_retries
+                            ep.name, attempt, retries_for_state
                         );
                         result = retry;
                         break;
