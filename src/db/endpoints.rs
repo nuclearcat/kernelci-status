@@ -7,6 +7,7 @@ pub struct Endpoint {
     pub name: String,
     pub subname: Option<String>,
     pub endpoint: String,
+    pub check_type: String,
     pub selector: Option<String>,
     pub condition: Option<String>,
     pub critical: bool,
@@ -15,7 +16,7 @@ pub struct Endpoint {
 
 pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<Endpoint>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, subname, endpoint, selector, condition, critical, enabled
+        "SELECT id, name, subname, endpoint, check_type, selector, condition, critical, enabled
          FROM endpoints ORDER BY name, subname",
     )?;
     let rows = stmt.query_map([], |row| {
@@ -24,10 +25,11 @@ pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<Endpoint>> {
             name: row.get(1)?,
             subname: row.get(2)?,
             endpoint: row.get(3)?,
-            selector: row.get(4)?,
-            condition: row.get(5)?,
-            critical: row.get(6)?,
-            enabled: row.get(7)?,
+            check_type: row.get(4)?,
+            selector: row.get(5)?,
+            condition: row.get(6)?,
+            critical: row.get(7)?,
+            enabled: row.get(8)?,
         })
     })?;
     rows.collect()
@@ -35,7 +37,7 @@ pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<Endpoint>> {
 
 pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<Endpoint>> {
     conn.query_row(
-        "SELECT id, name, subname, endpoint, selector, condition, critical, enabled
+        "SELECT id, name, subname, endpoint, check_type, selector, condition, critical, enabled
          FROM endpoints WHERE id = ?1",
         params![id],
         |row| {
@@ -44,10 +46,11 @@ pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<Endpoint
                 name: row.get(1)?,
                 subname: row.get(2)?,
                 endpoint: row.get(3)?,
-                selector: row.get(4)?,
-                condition: row.get(5)?,
-                critical: row.get(6)?,
-                enabled: row.get(7)?,
+                check_type: row.get(4)?,
+                selector: row.get(5)?,
+                condition: row.get(6)?,
+                critical: row.get(7)?,
+                enabled: row.get(8)?,
             })
         },
     )
@@ -56,7 +59,7 @@ pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<Endpoint
 
 pub fn list_enabled(conn: &Connection) -> rusqlite::Result<Vec<Endpoint>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, subname, endpoint, selector, condition, critical, enabled
+        "SELECT id, name, subname, endpoint, check_type, selector, condition, critical, enabled
          FROM endpoints WHERE enabled = 1 ORDER BY name, subname",
     )?;
     let rows = stmt.query_map([], |row| {
@@ -65,10 +68,11 @@ pub fn list_enabled(conn: &Connection) -> rusqlite::Result<Vec<Endpoint>> {
             name: row.get(1)?,
             subname: row.get(2)?,
             endpoint: row.get(3)?,
-            selector: row.get(4)?,
-            condition: row.get(5)?,
-            critical: row.get(6)?,
-            enabled: row.get(7)?,
+            check_type: row.get(4)?,
+            selector: row.get(5)?,
+            condition: row.get(6)?,
+            critical: row.get(7)?,
+            enabled: row.get(8)?,
         })
     })?;
     rows.collect()
@@ -78,6 +82,7 @@ pub struct NewEndpoint {
     pub name: String,
     pub subname: Option<String>,
     pub endpoint: String,
+    pub check_type: String,
     pub selector: Option<String>,
     pub condition: Option<String>,
     pub critical: bool,
@@ -86,12 +91,13 @@ pub struct NewEndpoint {
 
 pub fn insert(conn: &Connection, ep: &NewEndpoint) -> rusqlite::Result<i64> {
     conn.execute(
-        "INSERT INTO endpoints (name, subname, endpoint, selector, condition, critical, enabled)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO endpoints (name, subname, endpoint, check_type, selector, condition, critical, enabled)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
             ep.name,
             ep.subname,
             ep.endpoint,
+            ep.check_type,
             ep.selector,
             ep.condition,
             ep.critical,
@@ -103,12 +109,13 @@ pub fn insert(conn: &Connection, ep: &NewEndpoint) -> rusqlite::Result<i64> {
 
 pub fn update(conn: &Connection, id: i64, ep: &NewEndpoint) -> rusqlite::Result<bool> {
     let rows = conn.execute(
-        "UPDATE endpoints SET name=?1, subname=?2, endpoint=?3, selector=?4,
-         condition=?5, critical=?6, enabled=?7 WHERE id=?8",
+        "UPDATE endpoints SET name=?1, subname=?2, endpoint=?3, check_type=?4,
+         selector=?5, condition=?6, critical=?7, enabled=?8 WHERE id=?9",
         params![
             ep.name,
             ep.subname,
             ep.endpoint,
+            ep.check_type,
             ep.selector,
             ep.condition,
             ep.critical,

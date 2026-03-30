@@ -18,13 +18,8 @@ pub async fn check(endpoint: &Endpoint, _ctx: &CheckContext) -> CheckResult {
 }
 
 async fn do_check(endpoint: &Endpoint) -> Result<CheckResult, String> {
-    // endpoint format: k8s://namespace/label-selector
-    let url = &endpoint.endpoint;
-    let path = url.strip_prefix("k8s://").unwrap_or(url);
-    let (namespace, label_selector) = match path.split_once('/') {
-        Some((ns, sel)) => (ns, Some(sel)),
-        None => (path, None),
-    };
+    let namespace = &endpoint.endpoint;
+    let label_selector = endpoint.selector.as_deref();
 
     let config = tokio::time::timeout(API_TIMEOUT, Config::infer())
         .await

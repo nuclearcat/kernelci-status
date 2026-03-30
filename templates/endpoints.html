@@ -19,18 +19,32 @@
                 <input type="text" name="subname" placeholder="Latency, Cert Expiration, etc.">
             </label>
         </div>
-        <label>
-            Endpoint URL <span class="help-icon" tabindex="0">?<span class="help-tooltip help-tooltip-down">The URL to monitor. The <b>scheme</b> determines the check type:<br><br><code>https://</code> <code>http://</code><br>HTTP status code, latency, or TLS cert check<br><br><code>promhttp://</code> <code>promhttps://</code><br>Scrape Prometheus <code>/metrics</code> endpoint<br><br><code>postgresql://user:pass@host/db</code><br>PostgreSQL connectivity or query check<br><br><code>k8s://namespace</code> <code>k8s://ns/label=val</code><br>Kubernetes pod uptime via kubeconfig<br><br><code>ssh://user@host</code><br>Docker container uptime via SSH</span></span>
-            <input type="text" name="endpoint" required placeholder="https://api.kernelci.org">
-        </label>
         <div class="grid">
             <label>
-                Selector <span class="help-icon" tabindex="0">?<span class="help-tooltip">Determines <b>what to measure</b> from the endpoint. Depends on the endpoint scheme. Leave empty for a simple HTTP status code check.<br><br><b>HTTP / HTTPS:</b><br><code>latency</code> — response time in ms<br><code>cert_expiration</code> — TLS cert days remaining<br>(empty) — HTTP status code (2xx=OK, 5xx=CRITICAL)<br><br><b>Prometheus (promhttp/promhttps):</b><br><code>(metric_name)</code> — single metric<br><code>(metric_name,label=value)</code> — filtered by label<br><code>(node_filesystem_avail_bytes,mountpoint=/)</code><br>(empty) — just check endpoint is reachable<br><br><b>PostgreSQL:</b><br>SQL query to run and return a value<br><code>SELECT 1</code> — simple health check<br><code>SELECT pg_is_in_recovery()::int</code><br>(empty) — basic up/down connection test<br><br><b>Docker (ssh://):</b><br>Container name filter (substring match)<br><code>nginx</code> — only check nginx containers<br>(empty) — check all containers on host<br><br><b>Kubernetes (k8s://):</b><br>Label selector for pods<br><code>app=api</code> — only pods matching this label<br>(empty) — all pods in the namespace</span></span>
-                <input type="text" name="selector" placeholder="latency, cert_expiration, (metric,label=val)">
+                Endpoint <span class="help-icon" tabindex="0">?<span class="help-tooltip help-tooltip-down">The URL or connection target to monitor.<br><br><b>HTTP/TLS/Latency:</b> <code>https://api.kernelci.org</code><br><b>Prometheus:</b> <code>https://host/metrics</code> (full URL to metrics endpoint)<br><b>PostgreSQL:</b> <code>postgresql://user:pass@host/db</code><br><b>Kubernetes:</b> namespace name, e.g. <code>production</code><br><b>Docker:</b> <code>ssh://user@host</code></span></span>
+                <input type="text" name="endpoint" required placeholder="https://api.kernelci.org">
             </label>
             <label>
-                Condition <span class="help-icon" tabindex="0">?<span class="help-tooltip">Alert rule applied to the measured value. When the condition matches, the state becomes <b>WARNING</b> (or worse). Leave empty for default behavior (HTTP 5xx=CRITICAL, connection failures=CRITICAL).<br><br><b>Comparison operators:</b><br><code>&gt;N</code> — warn if value greater than N<br><code>&lt;N</code> — warn if value less than N<br><code>&gt;=N</code> <code>&lt;=N</code> — greater/less than or equal<br><code>==N</code> — warn if value equals N<br><code>!=N</code> — warn if value does not equal N<br><br><b>Diff over time:</b><br>Compare current value against a past measurement.<br><code>diff(12h)&gt;100</code> — warn if value grew by &gt;100 in last 12h<br><code>diff(24h)&lt;-50</code> — warn if value dropped by &gt;50 in 24h<br><br><b>Common examples:</b><br><code>&gt;90</code> — disk usage above 90%<br><code>&lt;7</code> — cert expires in &lt;7 days<br><code>&gt;500</code> — latency above 500ms<br><code>&gt;5</code> — error rate above 5%<br><code>diff(12h)&gt;1000000</code> — storage grew by &gt;1M in 12h</span></span>
-                <input type="text" name="condition" placeholder=">90, <7, diff(12h)>100">
+                Check Type <span class="help-icon" tabindex="0">?<span class="help-tooltip help-tooltip-down">Determines which checker runs for this endpoint.<br><br><code>http_status</code> — HTTP status code (2xx/5xx)<br><code>http_latency</code> — response time in ms<br><code>tls_cert</code> — TLS certificate days remaining<br><code>prometheus</code> — Prometheus metric query<br><code>postgresql</code> — PostgreSQL connectivity or query<br><code>kubernetes</code> — K8s pod uptime<br><code>docker</code> — Docker containers via SSH</span></span>
+                <select name="check_type" required>
+                    <option value="http_status">HTTP Status</option>
+                    <option value="http_latency">HTTP Latency</option>
+                    <option value="tls_cert">TLS Certificate</option>
+                    <option value="prometheus">Prometheus Metric</option>
+                    <option value="postgresql">PostgreSQL</option>
+                    <option value="kubernetes">Kubernetes Pods</option>
+                    <option value="docker">Docker via SSH</option>
+                </select>
+            </label>
+        </div>
+        <div class="grid">
+            <label>
+                Selector <span class="help-icon" tabindex="0">?<span class="help-tooltip">What to extract from the response. Depends on the check type. Leave empty when not applicable.<br><br><b>Prometheus:</b><br><code>(metric_name)</code> — single metric<br><code>(metric_name,label=value)</code> — filtered by label<br>(empty) — just check endpoint is reachable<br><br><b>PostgreSQL:</b><br>SQL query to run and return a value<br><code>SELECT 1</code> — simple health check<br>(empty) — basic up/down connection test<br><br><b>Docker:</b><br>Container name filter (substring match)<br><code>nginx</code> — only check nginx containers<br><br><b>Kubernetes:</b><br>Label selector for pods<br><code>app=api</code> — only pods matching this label<br><br><b>HTTP Status / Latency / TLS Cert:</b><br>Not used — leave empty</span></span>
+                <input type="text" name="selector" placeholder="(metric,label=val), SELECT 1, app=api">
+            </label>
+            <label>
+                Condition <span class="help-icon" tabindex="0">?<span class="help-tooltip">Alert rule applied to the measured value. When the condition matches, the state becomes <b>WARNING</b> (or worse). Leave empty for default behavior (HTTP 5xx=CRITICAL, connection failures=CRITICAL).<br><br><b>Comparison operators:</b><br><code>&gt;N</code> — warn if value greater than N<br><code>&lt;N</code> — warn if value less than N<br><code>&gt;=N</code> <code>&lt;=N</code> — greater/less than or equal<br><code>==N</code> — warn if value equals N<br><code>!=N</code> — warn if value does not equal N<br><br><b>Diff over time:</b><br>Compare current value against a past measurement.<br><code>diff(12h)&gt;100</code> — warn if value grew by &gt;100 in last 12h<br><code>diff(24h)&lt;-50</code> — warn if value dropped by &gt;50 in 24h<br><code>absdiff(12h)&gt;100</code> — warn if value changed by &gt;100 in either direction<br><br><b>Common examples:</b><br><code>&gt;90</code> — disk usage above 90%<br><code>&lt;7</code> — cert expires in &lt;7 days<br><code>&gt;500</code> — latency above 500ms<br><code>&gt;5</code> — error rate above 5%<br><code>diff(12h)&gt;1000000</code> — storage grew by &gt;1M in 12h</span></span>
+                <input type="text" name="condition" placeholder=">90, <7, diff(12h)>100, absdiff(12h)>50">
             </label>
         </div>
         <fieldset>
@@ -51,9 +65,10 @@
     <thead>
         <tr>
             <th>Name <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">Service name and optional sub-name in parentheses. Multiple rows can share a name with different sub-names for different checks on the same service.</span></span></th>
-            <th>Endpoint <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">URL to monitor. The scheme determines the check type:<br><code>http(s)://</code> — HTTP check<br><code>promhttp(s)://</code> — Prometheus<br><code>postgresql://</code> — PostgreSQL<br><code>k8s://</code> — Kubernetes<br><code>ssh://</code> — Docker via SSH</span></span></th>
-            <th>Selector <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">What to measure from the endpoint.<br><br><code>latency</code> — response time (ms)<br><code>cert_expiration</code> — TLS days left<br><code>(metric,label=val)</code> — Prometheus<br>SQL query — PostgreSQL<br>Container name — Docker<br><code>-</code> means default check</span></span></th>
-            <th>Condition <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">Alert threshold on measured value.<br><br><code>&gt;90</code> — warn above 90<br><code>&lt;7</code> — warn below 7<br><code>diff(12h)&gt;100</code> — warn on change<br><code>-</code> means no condition (default states only)</span></span></th>
+            <th>Endpoint <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">URL or connection target.<br><br><b>HTTP/TLS/Latency:</b> <code>https://host</code><br><b>Prometheus:</b> <code>https://host/metrics</code><br><b>PostgreSQL:</b> <code>postgresql://user:pass@host/db</code><br><b>Kubernetes:</b> namespace name<br><b>Docker:</b> <code>ssh://user@host</code></span></span></th>
+            <th>Type <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">Which checker runs for this endpoint.<br><br><code>http_status</code> — HTTP status code<br><code>http_latency</code> — response time (ms)<br><code>tls_cert</code> — TLS cert days left<br><code>prometheus</code> — Prometheus metric<br><code>postgresql</code> — PostgreSQL query<br><code>kubernetes</code> — K8s pod uptime<br><code>docker</code> — Docker via SSH</span></span></th>
+            <th>Selector <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">What to extract from the response.<br><br><code>(metric,label=val)</code> — Prometheus<br>SQL query — PostgreSQL<br>Label selector — Kubernetes<br>Container name — Docker<br><code>-</code> means not applicable</span></span></th>
+            <th>Condition <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">Alert threshold on measured value.<br><br><code>&gt;90</code> — warn above 90<br><code>&lt;7</code> — warn below 7<br><code>diff(12h)&gt;100</code> — warn on change<br><code>absdiff(12h)&gt;50</code> — warn on change in either direction<br><code>-</code> means no condition (default states only)</span></span></th>
             <th>Critical <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">Production-critical service. Gets highlighted in dashboard and flagged <code>[CRITICAL]</code> in notifications.</span></span></th>
             <th>Enabled <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">Whether the scheduler actively checks this endpoint every 15 minutes.</span></span></th>
             <th>Actions</th>
@@ -66,6 +81,7 @@
                 {{ ep.name }}{% if let Some(sub) = ep.subname %} <small>({{ sub }})</small>{% endif %}
             </td>
             <td><code>{{ ep.endpoint }}</code></td>
+            <td>{{ ep.check_type }}</td>
             <td>{{ ep.selector.as_deref().unwrap_or("-") }}</td>
             <td>{{ ep.condition.as_deref().unwrap_or("-") }}</td>
             <td>{% if ep.critical %}Yes{% else %}No{% endif %}</td>
@@ -83,7 +99,7 @@
             </td>
         </tr>
         <tr hidden>
-            <td colspan="7" class="edit-row">
+            <td colspan="8" class="edit-row">
                 <form method="post" action="/admin/endpoints/edit/{{ ep.id }}">
                     <div class="grid">
                         <label>
@@ -95,10 +111,24 @@
                             <input type="text" name="subname" value="{{ ep.subname.as_deref().unwrap_or("") }}">
                         </label>
                     </div>
-                    <label>
-                        Endpoint URL
-                        <input type="text" name="endpoint" value="{{ ep.endpoint }}" required>
-                    </label>
+                    <div class="grid">
+                        <label>
+                            Endpoint
+                            <input type="text" name="endpoint" value="{{ ep.endpoint }}" required>
+                        </label>
+                        <label>
+                            Check Type
+                            <select name="check_type" required>
+                                <option value="http_status" {% if ep.check_type == "http_status" %}selected{% endif %}>HTTP Status</option>
+                                <option value="http_latency" {% if ep.check_type == "http_latency" %}selected{% endif %}>HTTP Latency</option>
+                                <option value="tls_cert" {% if ep.check_type == "tls_cert" %}selected{% endif %}>TLS Certificate</option>
+                                <option value="prometheus" {% if ep.check_type == "prometheus" %}selected{% endif %}>Prometheus Metric</option>
+                                <option value="postgresql" {% if ep.check_type == "postgresql" %}selected{% endif %}>PostgreSQL</option>
+                                <option value="kubernetes" {% if ep.check_type == "kubernetes" %}selected{% endif %}>Kubernetes Pods</option>
+                                <option value="docker" {% if ep.check_type == "docker" %}selected{% endif %}>Docker via SSH</option>
+                            </select>
+                        </label>
+                    </div>
                     <div class="grid">
                         <label>
                             Selector

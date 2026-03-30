@@ -14,21 +14,11 @@ pub async fn check(endpoint: &Endpoint, ctx: &CheckContext) -> CheckResult {
 }
 
 async fn do_check(endpoint: &Endpoint, ctx: &CheckContext) -> Result<CheckResult, String> {
-    // Rewrite promhttp:// → http:// and promhttps:// → https://
-    let url = endpoint
-        .endpoint
-        .replacen("promhttps://", "https://", 1)
-        .replacen("promhttp://", "http://", 1);
-
-    let url = if url.ends_with("/metrics") {
-        url
-    } else {
-        format!("{}/metrics", url.trim_end_matches('/'))
-    };
+    let url = &endpoint.endpoint;
 
     let resp = ctx
         .http_client
-        .get(&url)
+        .get(url)
         .send()
         .await
         .map_err(|e| format!("Failed to scrape metrics: {e}"))?;

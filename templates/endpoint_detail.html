@@ -30,6 +30,7 @@
     <header>Configuration</header>
     <table>
         <tr><td><strong>Endpoint</strong></td><td><code>{{ endpoint.endpoint }}</code></td></tr>
+        <tr><td><strong>Check Type</strong></td><td>{{ endpoint.check_type }}</td></tr>
         <tr><td><strong>Selector</strong></td><td>{{ endpoint.selector.as_deref().unwrap_or("-") }}</td></tr>
         <tr><td><strong>Condition</strong></td><td>{{ endpoint.condition.as_deref().unwrap_or("-") }}</td></tr>
         <tr><td><strong>Critical</strong></td><td>{% if endpoint.critical %}Yes{% else %}No{% endif %}</td></tr>

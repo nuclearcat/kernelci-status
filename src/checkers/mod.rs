@@ -42,29 +42,18 @@ pub struct CheckContext {
 }
 
 pub async fn dispatch_check(endpoint: &Endpoint, ctx: &CheckContext) -> CheckResult {
-    let url = &endpoint.endpoint;
-
-    let result = if url.starts_with("http://") || url.starts_with("https://") {
-        match endpoint.selector.as_deref() {
-            Some("cert_expiration") => tls::check(endpoint, ctx).await,
-            Some("latency") => http::check_latency(endpoint, ctx).await,
-            _ => http::check(endpoint, ctx).await,
-        }
-    } else if url.starts_with("promhttp://") || url.starts_with("promhttps://") {
-        prometheus::check(endpoint, ctx).await
-    } else if url.starts_with("postgresql://") {
-        postgresql::check(endpoint, ctx).await
-    } else if url.starts_with("k8s://") {
-        kubernetes::check(endpoint, ctx).await
-    } else if url.starts_with("ssh://") {
-        docker::check(endpoint, ctx).await
-    } else {
-        CheckResult {
+    match endpoint.check_type.as_str() {
+        "http_status" => http::check(endpoint, ctx).await,
+        "http_latency" => http::check_latency(endpoint, ctx).await,
+        "tls_cert" => tls::check(endpoint, ctx).await,
+        "prometheus" => prometheus::check(endpoint, ctx).await,
+        "postgresql" => postgresql::check(endpoint, ctx).await,
+        "kubernetes" => kubernetes::check(endpoint, ctx).await,
+        "docker" => docker::check(endpoint, ctx).await,
+        other => CheckResult {
             state: EndpointState::NoData,
             value: None,
-            message: Some(format!("Unknown endpoint scheme: {url}")),
-        }
-    };
-
-    result
+            message: Some(format!("Unknown check_type: {other}")),
+        },
+    }
 }
