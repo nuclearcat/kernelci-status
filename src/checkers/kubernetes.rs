@@ -52,7 +52,7 @@ async fn do_check(endpoint: &Endpoint) -> Result<CheckResult, String> {
 
         if let Some(status) = &pod.status {
             if let Some(start_time) = status.start_time.as_ref() {
-                let start_ts = start_time.0.timestamp();
+                let start_ts = start_time.0.as_second();
                 let now_ts = now.timestamp();
                 let uptime_minutes = (now_ts - start_ts) / 60;
                 if uptime_minutes < 30 {

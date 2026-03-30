@@ -3,7 +3,7 @@ use axum::extract::State;
 use axum::http::header::SET_COOKIE;
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::Form;
-use rand::Rng;
+use rand::RngExt;
 use serde::Deserialize;
 
 use crate::state::AppState;
