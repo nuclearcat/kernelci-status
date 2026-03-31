@@ -65,16 +65,27 @@ nav.admin-nav {
     padding: 0.5rem 1.5rem;
     margin: 0;
     color: #fff;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+nav.admin-nav ul {
+    gap: 0.15rem;
+    flex-wrap: wrap;
 }
 
 nav.admin-nav a {
-    color: rgba(255, 255, 255, 0.75);
+    color: rgba(255, 255, 255, 0.7);
     text-decoration: none;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
 }
 
 nav.admin-nav a:hover {
     color: #fff;
+    background: rgba(255, 255, 255, 0.1);
 }
 
 nav.admin-nav strong {
@@ -85,13 +96,14 @@ nav.admin-nav strong {
 
 nav.admin-nav .logout-btn {
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: rgba(255, 255, 255, 0.8);
-    padding: 0.2rem 0.6rem;
-    font-size: 0.8rem;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: rgba(255, 255, 255, 0.7);
+    padding: 0.25rem 0.6rem;
+    font-size: 0.78rem;
     cursor: pointer;
     border-radius: 4px;
     margin: 0;
+    transition: border-color 0.15s, color 0.15s;
 }
 
 nav.admin-nav .logout-btn:hover {
@@ -116,6 +128,30 @@ nav.admin-nav .logout-btn:hover {
 .badge-warning { background: #b8860b; color: #fff; }
 .badge-critical { background: var(--kci-red); }
 .badge-nodata { background: var(--kci-gray-dim); }
+.badge-maintenance { background: var(--kci-blue-dark); }
+.badge-ok-maintenance { background: linear-gradient(135deg, var(--kci-green-dark) 50%, var(--kci-blue-dark) 50%); }
+.badge-warning-maintenance { background: linear-gradient(135deg, #b8860b 50%, var(--kci-blue-dark) 50%); }
+.badge-critical-maintenance { background: linear-gradient(135deg, var(--kci-red) 50%, var(--kci-blue-dark) 50%); }
+.badge-nodata-maintenance { background: linear-gradient(135deg, var(--kci-gray-dim) 50%, var(--kci-blue-dark) 50%); }
+
+/* ── Admin page headings ── */
+
+main.container > h2 {
+    color: var(--kci-navy);
+    font-size: 1.35rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--kci-border);
+}
+
+main.container > h3 {
+    color: var(--kci-navy);
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+}
 
 /* ── Admin dashboard counters ── */
 
@@ -340,6 +376,7 @@ code {
 .edit-row {
     background: var(--kci-blue-light);
     padding: 1rem 1.25rem;
+    border-top: 2px solid var(--kci-blue);
 }
 
 .edit-row form {
@@ -352,7 +389,10 @@ code {
     color: var(--kci-text);
 }
 
-.edit-row input[type="text"] {
+.edit-row input[type="text"],
+.edit-row input[type="number"],
+.edit-row input[type="datetime-local"],
+.edit-row select {
     font-size: 0.85rem;
     padding: 0.35rem 0.5rem;
     margin-bottom: 0.5rem;
@@ -364,14 +404,196 @@ code {
     border: none;
 }
 
+/* ── Checkbox grid (maintenance affected endpoints etc.) ── */
+
+.checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.15rem 1.5rem;
+    padding: 0.5rem 0;
+}
+
+.checkbox-grid label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.88rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 0;
+}
+
+.checkbox-grid label:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.checkbox-grid input[type="checkbox"] {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+/* ── Section cards (admin pages) ── */
+
+.admin-section {
+    border: 1px solid var(--kci-border);
+    border-radius: 8px;
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+}
+
+.admin-section > header {
+    background: #f5f6f8;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--kci-border);
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--kci-navy);
+}
+
+/* ── Details/summary (Add forms) ── */
+
+details {
+    border: 1px solid var(--kci-border);
+    border-radius: 8px;
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+}
+
+details > summary {
+    padding: 0.6rem 1rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--kci-navy);
+    cursor: pointer;
+    background: #f5f6f8;
+    border: none;
+    list-style: none;
+}
+
+details > summary::before {
+    content: "\25B6";
+    display: inline-block;
+    margin-right: 0.5rem;
+    font-size: 0.7rem;
+    transition: transform 0.15s;
+}
+
+details[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+details > summary:hover {
+    background: #eef0f3;
+}
+
+details[open] > summary {
+    border-bottom: 1px solid var(--kci-border);
+    margin-bottom: 0;
+}
+
+details > form,
+details > div {
+    padding: 1rem;
+}
+
+details > summary::-webkit-details-marker {
+    display: none;
+}
+
 /* ── Tables ── */
+
+table {
+    border-collapse: separate !important;
+    border-spacing: 0;
+    border: 1px solid var(--kci-border);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 0.88rem;
+    margin-bottom: 1.25rem;
+}
 
 table th {
     background: var(--kci-dark);
     color: #fff;
     font-weight: 500;
+    font-size: 0.82rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 2px solid var(--kci-navy);
+    border-top: none;
+    white-space: nowrap;
+}
+
+table td {
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid #eee;
+    border-top: none;
+    vertical-align: middle;
+}
+
+table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+table tbody tr:nth-child(even):not(:has(> td.edit-row)) {
+    background: #f8f9fb;
+}
+
+table tbody tr:hover:not(:has(> td.edit-row)) {
+    background: var(--kci-blue-light);
+}
+
+table code {
+    font-size: 0.78rem;
+    background: #f0f1f3;
+    padding: 0.15em 0.4em;
+    border-radius: 3px;
+    color: var(--kci-text);
+}
+
+/* ── Test endpoint result ── */
+
+.test-result-container {
+    margin-top: 0.5rem;
+    min-height: 0;
+}
+
+.test-result-container.htmx-request {
+    min-height: 2rem;
+    display: flex;
+    align-items: center;
+    color: var(--kci-text-muted);
     font-size: 0.85rem;
-    letter-spacing: 0.02em;
+}
+
+.test-result-container.htmx-request::before {
+    content: "Testing...";
+}
+
+.test-result {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.5rem 0.75rem;
+    background: #f5f6f8;
+    border: 1px solid var(--kci-border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+}
+
+.test-detail {
+    color: var(--kci-text);
+}
+
+.test-detail strong {
+    color: var(--kci-text-muted);
+    font-weight: 500;
 }
 
 /* ── Public status page ── */
@@ -461,6 +683,11 @@ article[id] pre code {
 .overall-critical {
     background: var(--kci-red-light);
     color: #8b2010;
+}
+
+.overall-maintenance {
+    background: var(--kci-blue-light);
+    color: var(--kci-blue-dark);
 }
 
 /* Service rows */
@@ -571,6 +798,11 @@ article[id] pre code {
 .dot-warning { background: var(--kci-yellow); }
 .dot-critical { background: var(--kci-red); }
 .dot-nodata { background: var(--kci-border); }
+.dot-maintenance { background: var(--kci-blue); }
+.dot-ok-maintenance { background: linear-gradient(135deg, var(--kci-green) 50%, var(--kci-blue) 50%); }
+.dot-warning-maintenance { background: linear-gradient(135deg, var(--kci-yellow) 50%, var(--kci-blue) 50%); }
+.dot-critical-maintenance { background: linear-gradient(135deg, var(--kci-red) 50%, var(--kci-blue) 50%); }
+.dot-nodata-maintenance { background: linear-gradient(135deg, var(--kci-gray) 50%, var(--kci-blue) 50%); }
 
 /* Timeline bar — 96 slots, 24h */
 .timeline-bar {
@@ -597,6 +829,11 @@ article[id] pre code {
 .slot-warning { background: var(--kci-yellow); }
 .slot-critical { background: var(--kci-red); }
 .slot-nodata { background: var(--kci-gray); }
+.slot-maintenance { background: var(--kci-blue); }
+.slot-ok-maintenance { background: linear-gradient(135deg, var(--kci-green) 50%, var(--kci-blue) 50%); }
+.slot-warning-maintenance { background: linear-gradient(135deg, var(--kci-yellow) 50%, var(--kci-blue) 50%); }
+.slot-critical-maintenance { background: linear-gradient(135deg, var(--kci-red) 50%, var(--kci-blue) 50%); }
+.slot-nodata-maintenance { background: linear-gradient(135deg, var(--kci-gray) 50%, var(--kci-blue) 50%); }
 
 /* .timeline-labels removed — replaced by global range toggle */
 
@@ -674,6 +911,33 @@ article[id] pre code {
     text-align: center;
     color: var(--kci-text-muted);
     padding: 3rem 0;
+}
+
+/* Color legend */
+.status-legend {
+    display: flex;
+    justify-content: center;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--kci-gray);
+    font-size: 0.8rem;
+    color: var(--kci-text-muted);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
 }
 
 /* ── Loading spinner ── */

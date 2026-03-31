@@ -50,6 +50,7 @@ pub struct ServiceGroup {
     pub current_state: String,
     pub current_state_css: String,
     pub uptime_pct: String,
+    pub sla_uptime_pct: String,
     pub timeline: Vec<TimelineSlot>,
     pub checks: Vec<CheckStatus>,
     pub expandable: bool,
@@ -88,8 +89,10 @@ struct EndpointData {
     subname: String,
     current_state: String,
     slot_states: Vec<String>,
-    /// Uptime from raw entries: (ok_or_warning_count, total_count)
+    /// Absolute uptime: (ok_or_warning_count, total_count) — ignores _MAINTENANCE tag
     entry_counts: (usize, usize),
+    /// SLA uptime: (ok_or_warning_count, non_maintenance_total) — excludes *_MAINTENANCE entirely
+    sla_entry_counts: (usize, usize),
 }
 
 /// Serve the status data fragment (called by HTMX on load + every 60s).
@@ -107,11 +110,6 @@ pub async fn status_data(
         .call(move |conn| {
             let endpoints = crate::db::endpoints::list_all(conn)?;
 
-            // Align `now` to the next slot boundary so that slot edges are
-            // stable across consecutive HTMX refreshes.  Without this,
-            // each 60-second refresh shifts all 96 boundaries, which can
-            // move a lone entry (common right after an outage) into the
-            // neighbouring slot, leaving the original slot as NO_DATA.
             let raw_now = chrono::Utc::now();
             let slot_secs = slot_minutes * 60;
             let ts = raw_now.timestamp();
@@ -120,12 +118,9 @@ pub async fn status_data(
             let now = chrono::DateTime::from_timestamp(aligned_ts, 0)
                 .unwrap_or(raw_now);
 
-            // Use the same aligned start for the DB query so that the
-            // returned entries exactly match the slot-mapping window.
             let start = now - chrono::Duration::hours(hours);
             let start_str = start.format("%Y-%m-%d %H:%M:%S").to_string();
 
-            // Collect per-endpoint data, grouped by name (BTreeMap for stable order).
             let mut by_name: BTreeMap<String, Vec<EndpointData>> = BTreeMap::new();
 
             for ep in &endpoints {
@@ -142,9 +137,34 @@ pub async fn status_data(
 
                 let slot_states = build_slot_states(&entries, now, hours, slot_minutes);
 
-                // Count raw entries for uptime (not slot-based).
-                let total = entries.len();
-                let ok_count = entries
+                // Absolute uptime: strip _MAINTENANCE suffix, count base state
+                // Exclude NO_DATA entries entirely — they are not failures
+                let non_nodata_entries: Vec<_> = entries
+                    .iter()
+                    .filter(|e| {
+                        let base = base_state(&e.state);
+                        base != "NO_DATA"
+                    })
+                    .collect();
+                let total = non_nodata_entries.len();
+                let ok_count = non_nodata_entries
+                    .iter()
+                    .filter(|e| {
+                        let base = base_state(&e.state);
+                        base == "OK" || base == "WARNING"
+                    })
+                    .count();
+
+                // SLA uptime: exclude _MAINTENANCE and NO_DATA entries entirely
+                let non_maint_entries: Vec<_> = entries
+                    .iter()
+                    .filter(|e| {
+                        let base = base_state(&e.state);
+                        !e.state.ends_with("_MAINTENANCE") && e.state != "MAINTENANCE" && base != "NO_DATA"
+                    })
+                    .collect();
+                let sla_total = non_maint_entries.len();
+                let sla_ok_count = non_maint_entries
                     .iter()
                     .filter(|e| e.state == "OK" || e.state == "WARNING")
                     .count();
@@ -157,24 +177,23 @@ pub async fn status_data(
                         current_state,
                         slot_states,
                         entry_counts: (ok_count, total),
+                        sla_entry_counts: (sla_ok_count, sla_total),
                     });
             }
 
-            // Build grouped results.
             let mut result = Vec::new();
             for (name, eps) in &by_name {
-                // Merge slot states across all checks: worst per slot (for visualization).
-                let mut merged_slots: Vec<&str> = vec!["NO_DATA"; SLOTS];
+                // Merge slot states: worst base state wins, maintenance tag preserved
+                let mut merged_slots: Vec<String> = vec!["NO_DATA".to_string(); SLOTS];
                 for ep in eps {
                     for (i, s) in ep.slot_states.iter().enumerate() {
-                        merged_slots[i] = worst_state(merged_slots[i], s);
+                        merged_slots[i] = merge_slot_state(&merged_slots[i], s);
                     }
                 }
 
                 let timeline = slots_to_timeline(&merged_slots, now, hours, slot_minutes);
 
-                // Uptime from raw entries: per-endpoint uptime, then take the minimum.
-                // This is independent of slot size, so 24h/7d/30d are consistent.
+                // Absolute uptime: per-endpoint, take the minimum
                 let uptime_pct = eps
                     .iter()
                     .filter_map(|e| {
@@ -187,11 +206,24 @@ pub async fn status_data(
                     .fold(f64::MAX, f64::min);
                 let uptime_pct = if uptime_pct == f64::MAX { 100.0 } else { uptime_pct };
 
-                // Group current state = worst across checks.
+                // SLA uptime
+                let sla_uptime_pct = eps
+                    .iter()
+                    .filter_map(|e| {
+                        if e.sla_entry_counts.1 > 0 {
+                            Some(e.sla_entry_counts.0 as f64 / e.sla_entry_counts.1 as f64 * 100.0)
+                        } else {
+                            None
+                        }
+                    })
+                    .fold(f64::MAX, f64::min);
+                let sla_uptime_pct = if sla_uptime_pct == f64::MAX { 100.0 } else { sla_uptime_pct };
+
+                // Group current state = worst across checks (using base state for ranking)
                 let group_state = eps
                     .iter()
                     .map(|e| e.current_state.as_str())
-                    .fold("NO_DATA", worst_state);
+                    .fold("NO_DATA".to_string(), |a, b| merge_slot_state(&a, b));
 
                 let checks: Vec<CheckStatus> = eps
                     .iter()
@@ -206,9 +238,10 @@ pub async fn status_data(
 
                 result.push(ServiceGroup {
                     name: name.clone(),
-                    current_state: group_state.to_string(),
-                    current_state_css: state_to_css(group_state).to_string(),
+                    current_state: group_state.clone(),
+                    current_state_css: state_to_css(&group_state).to_string(),
                     uptime_pct: format!("{:.2}%", uptime_pct),
+                    sla_uptime_pct: format!("{:.2}%", sla_uptime_pct),
                     timeline,
                     checks,
                     expandable,
@@ -218,13 +251,22 @@ pub async fn status_data(
         })
         .await?;
 
-    let has_critical = groups.iter().any(|g| g.current_state == "CRITICAL");
-    let has_warning = groups.iter().any(|g| g.current_state == "WARNING");
+    let has_critical = groups.iter().any(|g| {
+        let base = base_state(&g.current_state);
+        base == "CRITICAL"
+    });
+    let has_warning = groups.iter().any(|g| {
+        let base = base_state(&g.current_state);
+        base == "WARNING"
+    });
+    let has_maintenance = groups.iter().any(|g| g.current_state.contains("MAINTENANCE"));
 
     let (overall_label, overall_css) = if has_critical {
         ("Some systems are experiencing issues".to_string(), "overall-critical".to_string())
     } else if has_warning {
         ("Some systems have warnings".to_string(), "overall-warning".to_string())
+    } else if has_maintenance {
+        ("Some systems under planned maintenance".to_string(), "overall-maintenance".to_string())
     } else {
         ("All systems operational".to_string(), "overall-ok".to_string())
     };
@@ -241,7 +283,7 @@ pub async fn status_data(
     ))
 }
 
-/// Build raw slot states from history entries (used for cross-endpoint merging).
+/// Build raw slot states from history entries.
 fn build_slot_states(
     entries: &[HistoryEntry],
     now: chrono::DateTime<chrono::Utc>,
@@ -249,7 +291,7 @@ fn build_slot_states(
     slot_minutes: i64,
 ) -> Vec<String> {
     let start = now - chrono::Duration::hours(hours);
-    let mut slot_states: Vec<&str> = vec!["NO_DATA"; SLOTS];
+    let mut slot_states: Vec<String> = vec!["NO_DATA".to_string(); SLOTS];
 
     for entry in entries {
         let ts = match chrono::NaiveDateTime::parse_from_str(&entry.timestamp, "%Y-%m-%d %H:%M:%S")
@@ -267,16 +309,15 @@ fn build_slot_states(
             continue;
         }
 
-        let current_worst = slot_states[slot_idx];
-        slot_states[slot_idx] = worst_state(current_worst, &entry.state);
+        slot_states[slot_idx] = merge_slot_state(&slot_states[slot_idx], &entry.state);
     }
 
-    slot_states.into_iter().map(|s| s.to_string()).collect()
+    slot_states
 }
 
-/// Convert slot states into timeline slots (visualization only, no uptime calc).
+/// Convert slot states into timeline slots for rendering.
 fn slots_to_timeline(
-    slot_states: &[&str],
+    slot_states: &[String],
     now: chrono::DateTime<chrono::Utc>,
     hours: i64,
     slot_minutes: i64,
@@ -286,7 +327,7 @@ fn slots_to_timeline(
     slot_states
         .iter()
         .enumerate()
-        .map(|(i, &state)| {
+        .map(|(i, state)| {
             let slot_time = start + chrono::Duration::minutes(i as i64 * slot_minutes);
             let time_str = if hours <= 24 {
                 slot_time.format("%H:%M").to_string()
@@ -301,21 +342,48 @@ fn slots_to_timeline(
         .collect()
 }
 
-fn worst_state<'a>(a: &'a str, b: &'a str) -> &'a str {
+/// Strip _MAINTENANCE suffix to get the base state.
+fn base_state(s: &str) -> &str {
+    s.strip_suffix("_MAINTENANCE").unwrap_or(s)
+}
+
+/// Merge two states for slot visualization.
+/// The worse base state wins. Maintenance tag is preserved if either has it.
+fn merge_slot_state(a: &str, b: &str) -> String {
+    let base_a = base_state(a);
+    let base_b = base_state(b);
+    let maint_a = a.ends_with("_MAINTENANCE") || a == "MAINTENANCE";
+    let maint_b = b.ends_with("_MAINTENANCE") || b == "MAINTENANCE";
+    let either_maint = maint_a || maint_b;
+
     let rank = |s: &str| match s {
-        "CRITICAL" => 3,
-        "WARNING" => 2,
+        "CRITICAL" => 4,
+        "WARNING" => 3,
         "OK" => 1,
-        _ => 0,
+        _ => 0, // NO_DATA, MAINTENANCE
     };
-    if rank(b) > rank(a) { b } else { a }
+
+    let worse = if rank(base_b) > rank(base_a) { base_b } else { base_a };
+
+    if either_maint && worse != "NO_DATA" {
+        format!("{}_MAINTENANCE", worse)
+    } else if either_maint {
+        "MAINTENANCE".to_string()
+    } else {
+        worse.to_string()
+    }
 }
 
 fn state_to_css(state: &str) -> &str {
     match state {
         "OK" => "ok",
+        "OK_MAINTENANCE" => "ok-maintenance",
         "WARNING" => "warning",
+        "WARNING_MAINTENANCE" => "warning-maintenance",
         "CRITICAL" => "critical",
+        "CRITICAL_MAINTENANCE" => "critical-maintenance",
+        "MAINTENANCE" => "maintenance",
+        "NO_DATA_MAINTENANCE" => "nodata-maintenance",
         _ => "nodata",
     }
 }

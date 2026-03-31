@@ -3,6 +3,7 @@ pub mod dashboard;
 pub mod endpoints;
 pub mod help;
 pub mod history;
+pub mod maintenance;
 pub mod login;
 pub mod notifications;
 pub mod status;
@@ -72,6 +73,26 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/admin/endpoints/delete/{id}",
             axum::routing::post(endpoints::delete_endpoint),
+        )
+        .route(
+            "/admin/endpoints/test",
+            axum::routing::post(endpoints::test_endpoint),
+        )
+        .route(
+            "/admin/maintenance",
+            axum::routing::get(maintenance::maintenance_page),
+        )
+        .route(
+            "/admin/maintenance/add",
+            axum::routing::post(maintenance::add_maintenance),
+        )
+        .route(
+            "/admin/maintenance/edit/{id}",
+            axum::routing::post(maintenance::edit_maintenance),
+        )
+        .route(
+            "/admin/maintenance/delete/{id}",
+            axum::routing::post(maintenance::delete_maintenance),
         )
         .route(
             "/admin/notifications",

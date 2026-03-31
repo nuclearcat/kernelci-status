@@ -57,7 +57,16 @@
                 Enabled <span class="help-icon" tabindex="0">?<span class="help-tooltip">When enabled, the scheduler checks this endpoint every 15 minutes. Disable to temporarily pause monitoring without deleting the configuration.</span></span>
             </label>
         </fieldset>
-        <button type="submit">Add Endpoint</button>
+        <div class="action-group">
+            <button type="submit">Add Endpoint</button>
+            <button type="button" class="outline btn-sm"
+                    hx-post="/admin/endpoints/test"
+                    hx-include="closest form"
+                    hx-target="next .test-result-container"
+                    hx-indicator="next .test-result-container"
+                    hx-swap="innerHTML">Test</button>
+        </div>
+        <div class="test-result-container"></div>
     </form>
 </details>
 
@@ -145,8 +154,15 @@
                     </fieldset>
                     <div class="action-group">
                         <button type="submit" class="btn-sm">Save</button>
+                        <button type="button" class="outline btn-sm"
+                                hx-post="/admin/endpoints/test"
+                                hx-include="closest form"
+                                hx-target="next .test-result-container"
+                                hx-indicator="next .test-result-container"
+                                hx-swap="innerHTML">Test</button>
                         <button type="button" class="outline btn-sm" onclick="this.closest('tr').hidden=true">Cancel</button>
                     </div>
+                    <div class="test-result-container"></div>
                 </form>
             </td>
         </tr>

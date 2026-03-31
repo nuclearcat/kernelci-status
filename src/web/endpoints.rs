@@ -5,6 +5,7 @@ use axum::Form;
 use serde::Deserialize;
 
 use crate::auth::AuthUser;
+use crate::checkers::CheckContext;
 use crate::db::endpoints::{Endpoint, NewEndpoint};
 use crate::error::AppError;
 use crate::state::AppState;
@@ -135,4 +136,46 @@ pub async fn delete_endpoint(
     .await?;
 
     Ok(Redirect::to("/admin/endpoints"))
+}
+
+pub async fn test_endpoint(
+    State(state): State<AppState>,
+    _user: AuthUser,
+    Form(form): Form<EndpointForm>,
+) -> impl IntoResponse {
+    let ep = Endpoint {
+        id: 0,
+        name: form.name.clone(),
+        subname: form.subname.clone().filter(|s| !s.is_empty()),
+        endpoint: form.endpoint.clone(),
+        check_type: form.check_type.clone(),
+        selector: form.selector.clone().filter(|s| !s.is_empty()),
+        condition: form.condition.clone().filter(|s| !s.is_empty()),
+        critical: form.critical.as_deref() == Some("on"),
+        enabled: true,
+    };
+
+    let ctx = CheckContext {
+        http_client: state.http_client.clone(),
+    };
+
+    let result = crate::checkers::dispatch_check(&ep, &ctx).await;
+
+    let (badge_class, state_label) = match result.state {
+        crate::checkers::EndpointState::Ok => ("badge-ok", "OK"),
+        crate::checkers::EndpointState::Warning => ("badge-warning", "WARNING"),
+        crate::checkers::EndpointState::Critical => ("badge-critical", "CRITICAL"),
+        crate::checkers::EndpointState::NoData => ("badge-nodata", "NO DATA"),
+    };
+
+    let value_display = result.value.as_deref().unwrap_or("-");
+    let message_display = result.message.as_deref().unwrap_or("-");
+
+    Html(format!(
+        r#"<div class="test-result">
+            <span class="badge {badge_class}">{state_label}</span>
+            <span class="test-detail"><strong>Value:</strong> {value_display}</span>
+            <span class="test-detail"><strong>Message:</strong> {message_display}</span>
+        </div>"#
+    ))
 }

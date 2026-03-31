@@ -217,6 +217,7 @@ pub fn get_last_check_timestamp(conn: &Connection) -> rusqlite::Result<Option<St
 }
 
 /// Get all history entries for an endpoint from the last N hours.
+#[allow(dead_code)]
 pub fn get_last_hours(
     conn: &Connection,
     endpoint_id: i64,

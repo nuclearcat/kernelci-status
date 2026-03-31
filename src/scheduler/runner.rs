@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
@@ -55,6 +56,17 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
         "Checking {} endpoints (retries: {max_retries}, warning retries: {max_warning_retries})",
         endpoints.len()
     );
+
+    // Fetch endpoints currently in active maintenance windows (batch query)
+    let maintenance_ids: HashSet<i64> = {
+        let db = state.db.clone();
+        db.call(|conn| {
+            let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+            crate::db::maintenance::get_active_endpoint_ids(conn, &now)
+        })
+        .await
+        .unwrap_or_default()
+    };
 
     let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_CHECKS));
     let mut join_set = JoinSet::new();
@@ -146,8 +158,13 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
             .await
             .unwrap_or(None);
 
-        // Store result
-        let state_str = check_result.state.to_string();
+        // Store result — append _MAINTENANCE if endpoint is in an active window
+        let in_maintenance = maintenance_ids.contains(&endpoint.id);
+        let state_str = if in_maintenance {
+            format!("{}_MAINTENANCE", check_result.state)
+        } else {
+            check_result.state.to_string()
+        };
         let value = check_result.value.clone();
         let message = check_result.message.clone();
         let eid = endpoint.id;
@@ -179,15 +196,33 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
                 prev,
                 state_str
             );
-            let _ = state.notify_tx.try_send(NotificationEvent {
-                endpoint_name: endpoint.name.clone(),
-                subname: endpoint.subname.clone(),
-                old_state: prev.to_string(),
-                new_state: state_str,
-                message: check_result.message,
-                value: check_result.value,
-                critical: endpoint.critical,
-            });
+
+            // Suppress notifications during maintenance, but notify when
+            // maintenance ends and the state is still bad
+            let new_is_maint = state_str.ends_with("_MAINTENANCE");
+            let prev_is_maint = prev.ends_with("_MAINTENANCE");
+            let should_notify = if new_is_maint {
+                // Entering or staying in maintenance — suppress
+                false
+            } else if prev_is_maint {
+                // Maintenance just ended — always notify (real state exposed)
+                true
+            } else {
+                // Normal transition — notify
+                true
+            };
+
+            if should_notify {
+                let _ = state.notify_tx.try_send(NotificationEvent {
+                    endpoint_name: endpoint.name.clone(),
+                    subname: endpoint.subname.clone(),
+                    old_state: prev.to_string(),
+                    new_state: state_str,
+                    message: check_result.message,
+                    value: check_result.value,
+                    critical: endpoint.critical,
+                });
+            }
         }
     }
 

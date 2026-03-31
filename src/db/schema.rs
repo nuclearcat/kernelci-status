@@ -20,8 +20,25 @@ pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
             endpoint_id INTEGER NOT NULL REFERENCES endpoints(id),
             timestamp DATETIME NOT NULL DEFAULT (datetime('now')),
             value TEXT,
-            state TEXT NOT NULL CHECK (state IN ('OK','WARNING','CRITICAL','NO_DATA')),
+            state TEXT NOT NULL CHECK (state IN (
+                'OK','WARNING','CRITICAL','NO_DATA','MAINTENANCE',
+                'OK_MAINTENANCE','WARNING_MAINTENANCE','CRITICAL_MAINTENANCE','NO_DATA_MAINTENANCE'
+            )),
             message TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS maintenance_windows (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            start_time DATETIME NOT NULL,
+            end_time DATETIME NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS maintenance_window_endpoints (
+            window_id INTEGER NOT NULL REFERENCES maintenance_windows(id) ON DELETE CASCADE,
+            endpoint_id INTEGER NOT NULL REFERENCES endpoints(id) ON DELETE CASCADE,
+            PRIMARY KEY (window_id, endpoint_id)
         );
 
         CREATE TABLE IF NOT EXISTS config (
@@ -51,6 +68,81 @@ pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
     )?;
 
     migrate_add_check_type(conn)?;
+    migrate_maintenance_windows(conn)?;
+
+    Ok(())
+}
+
+/// Create maintenance_windows tables, update state_history CHECK for compound states,
+/// and drop the old `maintenance` boolean from endpoints if present.
+fn migrate_maintenance_windows(conn: &Connection) -> rusqlite::Result<()> {
+    // Create maintenance tables (IF NOT EXISTS handles fresh DBs)
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS maintenance_windows (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            start_time DATETIME NOT NULL,
+            end_time DATETIME NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS maintenance_window_endpoints (
+            window_id INTEGER NOT NULL REFERENCES maintenance_windows(id) ON DELETE CASCADE,
+            endpoint_id INTEGER NOT NULL REFERENCES endpoints(id) ON DELETE CASCADE,
+            PRIMARY KEY (window_id, endpoint_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_mw_time ON maintenance_windows(start_time, end_time);
+        ",
+    )?;
+
+    // Drop old maintenance column from endpoints if it exists
+    let has_maintenance = {
+        let mut stmt = conn.prepare("PRAGMA table_info(endpoints)")?;
+        let names: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?;
+        names.iter().any(|n| n == "maintenance")
+    };
+    if has_maintenance {
+        conn.execute_batch("ALTER TABLE endpoints DROP COLUMN maintenance")?;
+    }
+
+    // Update state_history CHECK constraint to support compound states.
+    // Probe by trying to insert a compound state.
+    let needs_constraint_update = conn
+        .execute(
+            "INSERT INTO state_history (endpoint_id, state, message) VALUES (-1, 'OK_MAINTENANCE', 'migration_probe')",
+            [],
+        )
+        .is_err();
+
+    if needs_constraint_update {
+        conn.execute_batch(
+            "
+            CREATE TABLE state_history_new (
+                id INTEGER PRIMARY KEY,
+                endpoint_id INTEGER NOT NULL REFERENCES endpoints(id),
+                timestamp DATETIME NOT NULL DEFAULT (datetime('now')),
+                value TEXT,
+                state TEXT NOT NULL CHECK (state IN (
+                    'OK','WARNING','CRITICAL','NO_DATA','MAINTENANCE',
+                    'OK_MAINTENANCE','WARNING_MAINTENANCE','CRITICAL_MAINTENANCE','NO_DATA_MAINTENANCE'
+                )),
+                message TEXT
+            );
+            INSERT INTO state_history_new SELECT * FROM state_history;
+            DROP TABLE state_history;
+            ALTER TABLE state_history_new RENAME TO state_history;
+            CREATE INDEX IF NOT EXISTS idx_history_endpoint_ts
+                ON state_history(endpoint_id, timestamp DESC);
+            ",
+        )?;
+    } else {
+        conn.execute(
+            "DELETE FROM state_history WHERE endpoint_id = -1 AND message = 'migration_probe'",
+            [],
+        )?;
+    }
 
     Ok(())
 }

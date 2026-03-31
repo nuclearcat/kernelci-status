@@ -44,6 +44,9 @@
             </div>
             <div class="status-row-uptime">
                 {{ grp.uptime_pct }} uptime
+                {% if grp.sla_uptime_pct != grp.uptime_pct %}
+                <br><small>{{ grp.sla_uptime_pct }} SLA</small>
+                {% endif %}
             </div>
         </div>
         <div class="timeline-bar">
@@ -69,5 +72,15 @@
 {% if groups.is_empty() %}
 <p class="status-empty">No monitored services configured.</p>
 {% endif %}
+
+<div class="status-legend">
+    <span class="legend-item"><span class="legend-dot dot-ok"></span> Operational</span>
+    <span class="legend-item"><span class="legend-dot dot-warning"></span> Warning</span>
+    <span class="legend-item"><span class="legend-dot dot-critical"></span> Critical</span>
+    <span class="legend-item"><span class="legend-dot dot-nodata"></span> No Data</span>
+    <span class="legend-item"><span class="legend-dot dot-maintenance"></span> Maintenance</span>
+    <span class="legend-item"><span class="legend-dot dot-ok-maintenance"></span> OK + Maintenance</span>
+    <span class="legend-item"><span class="legend-dot dot-critical-maintenance"></span> Down + Maintenance</span>
+</div>
 
 </div>

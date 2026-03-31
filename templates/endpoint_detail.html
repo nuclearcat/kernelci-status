@@ -13,10 +13,18 @@
             <strong>State:</strong>
             {% if current_state == "OK" %}
             <span class="badge badge-ok">OK</span>
+            {% else if current_state == "OK_MAINTENANCE" %}
+            <span class="badge badge-ok-maintenance">OK / MAINT</span>
             {% else if current_state == "WARNING" %}
             <span class="badge badge-warning">WARNING</span>
+            {% else if current_state == "WARNING_MAINTENANCE" %}
+            <span class="badge badge-warning-maintenance">WARN / MAINT</span>
             {% else if current_state == "CRITICAL" %}
             <span class="badge badge-critical">CRITICAL</span>
+            {% else if current_state == "CRITICAL_MAINTENANCE" %}
+            <span class="badge badge-critical-maintenance">CRIT / MAINT</span>
+            {% else if current_state == "MAINTENANCE" %}
+            <span class="badge badge-maintenance">MAINTENANCE</span>
             {% else %}
             <span class="badge badge-nodata">NO DATA</span>
             {% endif %}
@@ -55,10 +63,18 @@
             <td>
                 {% if h.state == "OK" %}
                 <span class="badge badge-ok">OK</span>
+                {% else if h.state == "OK_MAINTENANCE" %}
+                <span class="badge badge-ok-maintenance">OK / MAINT</span>
                 {% else if h.state == "WARNING" %}
                 <span class="badge badge-warning">WARNING</span>
+                {% else if h.state == "WARNING_MAINTENANCE" %}
+                <span class="badge badge-warning-maintenance">WARN / MAINT</span>
                 {% else if h.state == "CRITICAL" %}
                 <span class="badge badge-critical">CRITICAL</span>
+                {% else if h.state == "CRITICAL_MAINTENANCE" %}
+                <span class="badge badge-critical-maintenance">CRIT / MAINT</span>
+                {% else if h.state == "MAINTENANCE" %}
+                <span class="badge badge-maintenance">MAINTENANCE</span>
                 {% else %}
                 <span class="badge badge-nodata">NO DATA</span>
                 {% endif %}

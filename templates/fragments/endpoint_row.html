@@ -15,10 +15,18 @@
             <td>
                 {% if ep.state == "OK" %}
                 <span class="badge badge-ok">OK</span>
+                {% else if ep.state == "OK_MAINTENANCE" %}
+                <span class="badge badge-ok-maintenance">OK / MAINT</span>
                 {% else if ep.state == "WARNING" %}
                 <span class="badge badge-warning">WARNING</span>
+                {% else if ep.state == "WARNING_MAINTENANCE" %}
+                <span class="badge badge-warning-maintenance">WARN / MAINT</span>
                 {% else if ep.state == "CRITICAL" %}
                 <span class="badge badge-critical">CRITICAL</span>
+                {% else if ep.state == "CRITICAL_MAINTENANCE" %}
+                <span class="badge badge-critical-maintenance">CRIT / MAINT</span>
+                {% else if ep.state == "MAINTENANCE" %}
+                <span class="badge badge-maintenance">MAINTENANCE</span>
                 {% else %}
                 <span class="badge badge-nodata">NO DATA</span>
                 {% endif %}
