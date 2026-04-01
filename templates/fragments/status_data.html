@@ -10,6 +10,42 @@
     </div>
 </div>
 
+{% if !active_maintenance.is_empty() %}
+<div class="maintenance-notice maintenance-active">
+    <div class="maintenance-notice-icon">&#9888;</div>
+    <div class="maintenance-notice-body">
+        <strong>Maintenance in progress</strong>
+        {% for mw in active_maintenance %}
+        <div class="maintenance-notice-item">
+            <span class="maintenance-notice-name">{{ mw.name }}</span>
+            <span class="maintenance-notice-time">{{ mw.start_time }} &mdash; {{ mw.end_time }} UTC</span>
+            {% if !mw.endpoint_names.is_empty() %}
+            <span class="maintenance-notice-endpoints">Affected: {{ mw.endpoint_names.join(", ") }}</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+{% if !upcoming_maintenance.is_empty() %}
+<div class="maintenance-notice maintenance-upcoming">
+    <div class="maintenance-notice-icon">&#128197;</div>
+    <div class="maintenance-notice-body">
+        <strong>Scheduled maintenance</strong>
+        {% for mw in upcoming_maintenance %}
+        <div class="maintenance-notice-item">
+            <span class="maintenance-notice-name">{{ mw.name }}</span>
+            <span class="maintenance-notice-time">{{ mw.start_time }} &mdash; {{ mw.end_time }} UTC</span>
+            {% if !mw.endpoint_names.is_empty() %}
+            <span class="maintenance-notice-endpoints">Affected: {{ mw.endpoint_names.join(", ") }}</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <div class="range-toggle">
     <button class="range-btn{% if active_range == "24h" %} active{% endif %}"
             hx-get="/status/data?range=24h" hx-target="#status-data" hx-swap="outerHTML"

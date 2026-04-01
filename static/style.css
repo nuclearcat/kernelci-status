@@ -690,6 +690,65 @@ article[id] pre code {
     color: var(--kci-blue-dark);
 }
 
+/* ── Maintenance notices (public status page) ── */
+
+.maintenance-notice {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 0.6rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.maintenance-active {
+    background: #fff3cd;
+    border-left: 4px solid #c28b00;
+    color: #664d03;
+}
+
+.maintenance-upcoming {
+    background: var(--kci-blue-light);
+    border-left: 4px solid var(--kci-blue);
+    color: var(--kci-navy);
+}
+
+.maintenance-notice-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    line-height: 1.4;
+}
+
+.maintenance-notice-body strong {
+    display: block;
+    margin-bottom: 0.2rem;
+}
+
+.maintenance-notice-item {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem 0.75rem;
+    padding: 0.15rem 0;
+}
+
+.maintenance-notice-name {
+    font-weight: 500;
+}
+
+.maintenance-notice-time {
+    font-size: 0.8rem;
+    opacity: 0.8;
+    font-variant-numeric: tabular-nums;
+}
+
+.maintenance-notice-endpoints {
+    font-size: 0.8rem;
+    opacity: 0.75;
+    width: 100%;
+}
+
 /* Service rows */
 /* ── Range toggle ── */
 

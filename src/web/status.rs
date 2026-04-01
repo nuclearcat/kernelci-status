@@ -5,6 +5,7 @@ use serde::Deserialize;
 use std::collections::BTreeMap;
 
 use crate::db::history::HistoryEntry;
+use crate::db::maintenance::MaintenanceWindow;
 use crate::error::AppError;
 use crate::state::AppState;
 
@@ -63,6 +64,14 @@ struct StatusShellTemplate {
     year: i32,
 }
 
+/// A maintenance window with resolved endpoint names for display.
+pub struct MaintenanceBanner {
+    pub name: String,
+    pub start_time: String,
+    pub end_time: String,
+    pub endpoint_names: Vec<String>,
+}
+
 /// Data fragment returned by /status/data.
 #[derive(Template)]
 #[template(path = "fragments/status_data.html")]
@@ -71,6 +80,8 @@ struct StatusDataTemplate {
     overall_label: String,
     overall_css: String,
     active_range: String,
+    active_maintenance: Vec<MaintenanceBanner>,
+    upcoming_maintenance: Vec<MaintenanceBanner>,
 }
 
 /// Serve the page shell (header + spinner + footer). Data loaded via HTMX.
@@ -106,7 +117,7 @@ pub async fn status_data(
     let active_range = range_cfg.label.to_string();
 
     let db = state.db.clone();
-    let groups: Vec<ServiceGroup> = db
+    let (groups, active_maintenance, upcoming_maintenance): (Vec<ServiceGroup>, Vec<MaintenanceBanner>, Vec<MaintenanceBanner>) = db
         .call(move |conn| {
             let endpoints = crate::db::endpoints::list_all(conn)?;
 
@@ -247,7 +258,42 @@ pub async fn status_data(
                     expandable,
                 });
             }
-            Ok(result)
+
+            // Fetch active & upcoming maintenance windows
+            let now_str = raw_now.format("%Y-%m-%d %H:%M:%S").to_string();
+            let active_mw = crate::db::maintenance::get_active(conn, &now_str)?;
+            let upcoming_mw = crate::db::maintenance::get_upcoming(conn, &now_str, 7)?;
+
+            let resolve_names = |windows: Vec<MaintenanceWindow>| -> Vec<MaintenanceBanner> {
+                windows
+                    .into_iter()
+                    .map(|w| {
+                        let names: Vec<String> = w
+                            .endpoint_ids
+                            .iter()
+                            .filter_map(|eid| {
+                                endpoints.iter().find(|ep| ep.id == *eid).map(|ep| {
+                                    match &ep.subname {
+                                        Some(sub) => format!("{} ({})", ep.name, sub),
+                                        None => ep.name.clone(),
+                                    }
+                                })
+                            })
+                            .collect();
+                        MaintenanceBanner {
+                            name: w.name,
+                            start_time: w.start_time,
+                            end_time: w.end_time,
+                            endpoint_names: names,
+                        }
+                    })
+                    .collect()
+            };
+
+            let active_banners = resolve_names(active_mw);
+            let upcoming_banners = resolve_names(upcoming_mw);
+
+            Ok((result, active_banners, upcoming_banners))
         })
         .await?;
 
@@ -277,6 +323,8 @@ pub async fn status_data(
             overall_label,
             overall_css,
             active_range,
+            active_maintenance,
+            upcoming_maintenance,
         }
         .render()
         .unwrap_or_default(),
