@@ -69,6 +69,7 @@ pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
 
     migrate_add_check_type(conn)?;
     migrate_maintenance_windows(conn)?;
+    migrate_incidents(conn)?;
 
     Ok(())
 }
@@ -225,6 +226,69 @@ fn migrate_add_check_type(conn: &Connection) -> rusqlite::Result<()> {
                 params![namespace, labels, id],
             )?;
         }
+    }
+
+    Ok(())
+}
+
+fn migrate_incidents(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS incidents (
+            id INTEGER PRIMARY KEY,
+            endpoint_id INTEGER NOT NULL REFERENCES endpoints(id),
+            title TEXT NOT NULL,
+            severity TEXT NOT NULL DEFAULT 'critical',
+            status TEXT NOT NULL DEFAULT 'detected',
+            assigned_user_id INTEGER REFERENCES users(id),
+            public_message TEXT,
+            created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+            acknowledged_at DATETIME,
+            resolved_at DATETIME,
+            auto_created INTEGER NOT NULL DEFAULT 0,
+            postmortem TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS incident_updates (
+            id INTEGER PRIMARY KEY,
+            incident_id INTEGER NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+            update_type TEXT NOT NULL,
+            status TEXT,
+            message TEXT,
+            user_id INTEGER,
+            created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS incident_tokens (
+            id INTEGER PRIMARY KEY,
+            incident_id INTEGER NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            token TEXT NOT NULL UNIQUE,
+            used_at DATETIME,
+            expires_at DATETIME NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_incidents_endpoint_status
+            ON incidents(endpoint_id, status);
+        CREATE INDEX IF NOT EXISTS idx_incident_tokens_token
+            ON incident_tokens(token);
+        CREATE INDEX IF NOT EXISTS idx_incident_updates_incident
+            ON incident_updates(incident_id, created_at);
+        ",
+    )?;
+
+    // Add email column to users table if it doesn't exist
+    let has_email = {
+        let mut stmt = conn.prepare("PRAGMA table_info(users)")?;
+        let names: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?;
+        names.iter().any(|n| n == "email")
+    };
+    if !has_email {
+        conn.execute_batch("ALTER TABLE users ADD COLUMN email TEXT")?;
     }
 
     Ok(())

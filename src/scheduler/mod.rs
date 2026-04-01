@@ -36,6 +36,7 @@ pub async fn run(state: AppState, mut shutdown_rx: watch::Receiver<bool>) {
     if let Err(e) = runner::run_all_checks(&state).await {
         error!("Check cycle failed: {e}");
     }
+    crate::web::incidents::check_escalations(&state).await;
 
     let interval_mins = get_interval_mins(&state).await;
     info!("Scheduler running ({interval_mins} minute interval)");
@@ -50,6 +51,7 @@ pub async fn run(state: AppState, mut shutdown_rx: watch::Receiver<bool>) {
                 if let Err(e) = runner::run_all_checks(&state).await {
                     error!("Check cycle failed: {e}");
                 }
+                crate::web::incidents::check_escalations(&state).await;
             }
             _ = shutdown_rx.changed() => {
                 info!("Scheduler shutting down");

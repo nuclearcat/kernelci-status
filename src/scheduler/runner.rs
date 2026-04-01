@@ -4,6 +4,7 @@ use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 use tracing::{error, info};
+use rusqlite;
 
 use crate::checkers::{self, CheckContext, CheckResult, EndpointState};
 use crate::db::endpoints::Endpoint;
@@ -217,11 +218,96 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
                     endpoint_name: endpoint.name.clone(),
                     subname: endpoint.subname.clone(),
                     old_state: prev.to_string(),
-                    new_state: state_str,
+                    new_state: state_str.clone(),
                     message: check_result.message,
                     value: check_result.value,
                     critical: endpoint.critical,
                 });
+            }
+
+            // ── Incident auto-management ──
+            let base = state_str
+                .strip_suffix("_MAINTENANCE")
+                .unwrap_or(&state_str);
+
+            if base == "CRITICAL" && !new_is_maint {
+                // Auto-create incident if none open for this endpoint
+                let eid = endpoint.id;
+                let db = state.db.clone();
+                let has_open = db
+                    .call(move |conn| -> rusqlite::Result<bool> {
+                        Ok(crate::db::incidents::get_open_for_endpoint(conn, eid)?.is_some())
+                    })
+                    .await
+                    .unwrap_or(false);
+
+                if !has_open {
+                    let ep_name = match &endpoint.subname {
+                        Some(sub) => format!("{} ({})", endpoint.name, sub),
+                        None => endpoint.name.clone(),
+                    };
+                    let title = format!("{} is CRITICAL", ep_name);
+                    let eid = endpoint.id;
+                    let t = title.clone();
+                    let db = state.db.clone();
+                    let inc_id = db
+                        .call(move |conn| -> rusqlite::Result<i64> {
+                            let new = crate::db::incidents::NewIncident {
+                                endpoint_id: eid,
+                                title: t,
+                                severity: "critical".to_string(),
+                                auto_created: true,
+                            };
+                            let id = crate::db::incidents::insert(conn, &new)?;
+                            crate::db::incidents::add_update(
+                                conn,
+                                id,
+                                "status_change",
+                                Some("detected"),
+                                Some("Auto-detected by monitoring"),
+                                None,
+                            )?;
+                            Ok(id)
+                        })
+                        .await;
+
+                    if let Ok(inc_id) = inc_id {
+                        info!("Auto-created incident #{inc_id} for {}", endpoint.name);
+                        crate::web::incidents::send_incident_created_emails(
+                            state,
+                            inc_id,
+                            &title,
+                            &ep_name,
+                            "critical",
+                        )
+                        .await;
+                    }
+                }
+            } else if base == "OK" {
+                // Auto-resolve open auto-created incidents for this endpoint
+                let eid = endpoint.id;
+                let db = state.db.clone();
+                let _ = db
+                    .call(move |conn| -> rusqlite::Result<()> {
+                        if let Some(inc) =
+                            crate::db::incidents::get_open_for_endpoint(conn, eid)?
+                        {
+                            if inc.auto_created {
+                                crate::db::incidents::update_status(conn, inc.id, "resolved")?;
+                                crate::db::incidents::add_update(
+                                    conn,
+                                    inc.id,
+                                    "auto_resolve",
+                                    Some("resolved"),
+                                    Some("Endpoint returned to OK"),
+                                    None,
+                                )?;
+                                tracing::info!("Auto-resolved incident #{}", inc.id);
+                            }
+                        }
+                        Ok(())
+                    })
+                    .await;
             }
         }
     }

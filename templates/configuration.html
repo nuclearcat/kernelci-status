@@ -81,6 +81,22 @@
         </div>
         <button type="submit">Save Configuration</button>
     </article>
+
+    <article>
+        <header><h3>Incident Settings</h3></header>
+        <div class="grid">
+            <label>
+                Public Base URL
+                <input type="url" name="base_url" value="{{ c.base_url }}" placeholder="https://status.example.com">
+                <small>Used for incident email action links. No trailing slash.</small>
+            </label>
+            <label>
+                Escalation Timeout (minutes)
+                <input type="number" name="incident_escalation_minutes" value="{{ c.incident_escalation_minutes }}" placeholder="30" min="5" max="1440">
+                <small>Re-notify admins if incident not acknowledged within this time. Default: 30 min.</small>
+            </label>
+        </div>
+    </article>
 </form>
 
 <article>

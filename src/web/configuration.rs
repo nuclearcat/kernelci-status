@@ -21,6 +21,8 @@ pub struct AppConfigView {
     pub smtp_tls: bool,
     pub email_from: String,
     pub email_from_name: String,
+    pub base_url: String,
+    pub incident_escalation_minutes: String,
 }
 
 impl AppConfigView {
@@ -40,6 +42,8 @@ impl AppConfigView {
             smtp_tls: m.get("smtp_tls").is_some_and(|v| v == "true"),
             email_from: g("email_from", ""),
             email_from_name: g("email_from_name", "KernelCI Status"),
+            base_url: g("base_url", ""),
+            incident_escalation_minutes: g("incident_escalation_minutes", "30"),
         }
     }
 }
@@ -84,6 +88,8 @@ pub struct ConfigurationForm {
     pub smtp_tls: Option<String>,
     pub email_from: Option<String>,
     pub email_from_name: Option<String>,
+    pub base_url: Option<String>,
+    pub incident_escalation_minutes: Option<String>,
 }
 
 pub async fn save_configuration(
@@ -242,6 +248,10 @@ pub async fn save_configuration(
         set_toggle("smtp_tls", &form.smtp_tls)?;
         set("email_from", &from_email)?;
         set("email_from_name", form.email_from_name.as_deref().unwrap_or("KernelCI Status"))?;
+        // Strip trailing slash from base_url
+        let base = form.base_url.as_deref().unwrap_or("").trim_end_matches('/');
+        set("base_url", base)?;
+        set("incident_escalation_minutes", form.incident_escalation_minutes.as_deref().unwrap_or("30"))?;
         Ok(())
     })
     .await?;

@@ -1028,6 +1028,123 @@ article[id] pre code {
     to { transform: rotate(360deg); }
 }
 
+/* ── Incident badges ── */
+
+.badge-incident-detected { background: var(--kci-red); }
+.badge-incident-acknowledged { background: #b8860b; color: #fff; }
+.badge-incident-investigating { background: #7c3aed; }
+.badge-incident-identified { background: var(--kci-blue-dark); }
+.badge-incident-monitoring { background: #0891b2; }
+.badge-incident-resolved { background: var(--kci-green-dark); }
+
+.badge-incident-type-status_change { background: var(--kci-blue-dark); font-size: 0.65rem; }
+.badge-incident-type-comment { background: var(--kci-gray-dim); font-size: 0.65rem; }
+.badge-incident-type-handover { background: #7c3aed; font-size: 0.65rem; }
+.badge-incident-type-auto_resolve { background: var(--kci-green-dark); font-size: 0.65rem; }
+.badge-incident-type-assignment { background: #0891b2; font-size: 0.65rem; }
+
+/* ── Incident detail: timeline ── */
+
+.incident-timeline {
+    position: relative;
+    padding-left: 1.5rem;
+    margin: 1rem 0;
+}
+
+.incident-timeline::before {
+    content: "";
+    position: absolute;
+    left: 0.45rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--kci-border);
+}
+
+.incident-timeline-entry {
+    position: relative;
+    padding: 0.5rem 0 0.75rem 1rem;
+}
+
+.incident-timeline-dot {
+    position: absolute;
+    left: -1.2rem;
+    top: 0.65rem;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--kci-border);
+    border: 2px solid #fff;
+}
+
+.incident-timeline-dot.dot-ok { background: var(--kci-green); }
+.incident-timeline-dot.dot-status { background: var(--kci-blue); }
+.incident-timeline-dot.dot-handover { background: #7c3aed; }
+.incident-timeline-dot.dot-comment { background: var(--kci-gray-dim); }
+
+.incident-timeline-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.82rem;
+    margin-bottom: 0.2rem;
+}
+
+.incident-timeline-message {
+    font-size: 0.85rem;
+    color: var(--kci-text);
+    margin: 0.2rem 0 0;
+    line-height: 1.5;
+}
+
+/* ── Incident notice on public status page ── */
+
+.incidents-notice {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 0.6rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    background: var(--kci-red-light);
+    border-left: 4px solid var(--kci-red);
+    color: #8b2010;
+}
+
+.incident-notice-item {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.5rem;
+    padding: 0.2rem 0;
+}
+
+.incident-notice-title {
+    font-weight: 500;
+}
+
+.incident-notice-assignee {
+    color: #8b2010;
+    opacity: 0.75;
+}
+
+.incident-notice-message {
+    width: 100%;
+    margin: 0.15rem 0 0;
+    font-style: italic;
+    font-size: 0.82rem;
+    opacity: 0.85;
+}
+
+/* ── Incident header section ── */
+
+.incident-header {
+    margin-bottom: 1rem;
+}
+
 /* HTMX indicator: hidden by default, shown when request in flight */
 .htmx-indicator {
     display: none !important;

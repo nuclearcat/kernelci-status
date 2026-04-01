@@ -72,6 +72,16 @@ pub struct MaintenanceBanner {
     pub endpoint_names: Vec<String>,
 }
 
+/// An active incident for display on the public status page.
+pub struct IncidentBanner {
+    pub title: String,
+    pub severity: String,
+    pub severity_css: String,
+    pub status: String,
+    pub assigned_username: Option<String>,
+    pub public_message: Option<String>,
+}
+
 /// Data fragment returned by /status/data.
 #[derive(Template)]
 #[template(path = "fragments/status_data.html")]
@@ -82,6 +92,7 @@ struct StatusDataTemplate {
     active_range: String,
     active_maintenance: Vec<MaintenanceBanner>,
     upcoming_maintenance: Vec<MaintenanceBanner>,
+    active_incidents: Vec<IncidentBanner>,
 }
 
 /// Serve the page shell (header + spinner + footer). Data loaded via HTMX.
@@ -117,7 +128,7 @@ pub async fn status_data(
     let active_range = range_cfg.label.to_string();
 
     let db = state.db.clone();
-    let (groups, active_maintenance, upcoming_maintenance): (Vec<ServiceGroup>, Vec<MaintenanceBanner>, Vec<MaintenanceBanner>) = db
+    let (groups, active_maintenance, upcoming_maintenance, active_incidents): (Vec<ServiceGroup>, Vec<MaintenanceBanner>, Vec<MaintenanceBanner>, Vec<IncidentBanner>) = db
         .call(move |conn| {
             let endpoints = crate::db::endpoints::list_all(conn)?;
 
@@ -293,7 +304,32 @@ pub async fn status_data(
             let active_banners = resolve_names(active_mw);
             let upcoming_banners = resolve_names(upcoming_mw);
 
-            Ok((result, active_banners, upcoming_banners))
+            // Fetch active incidents
+            let active_incs = crate::db::incidents::list_active(conn)?;
+            let users = crate::db::users::list_all(conn)?;
+            let incident_banners: Vec<IncidentBanner> = active_incs
+                .into_iter()
+                .map(|inc| {
+                    let assigned = inc
+                        .assigned_user_id
+                        .and_then(|uid| users.iter().find(|u| u.id == uid))
+                        .map(|u| u.username.clone());
+                    let sev_css = match inc.severity.as_str() {
+                        "critical" => "critical",
+                        _ => "warning",
+                    };
+                    IncidentBanner {
+                        title: inc.title,
+                        severity: inc.severity,
+                        severity_css: sev_css.to_string(),
+                        status: inc.status,
+                        assigned_username: assigned,
+                        public_message: inc.public_message,
+                    }
+                })
+                .collect();
+
+            Ok((result, active_banners, upcoming_banners, incident_banners))
         })
         .await?;
 
@@ -325,6 +361,7 @@ pub async fn status_data(
             active_range,
             active_maintenance,
             upcoming_maintenance,
+            active_incidents,
         }
         .render()
         .unwrap_or_default(),

@@ -95,6 +95,27 @@ pub async fn change_password(
     Ok(Redirect::to("/admin/users"))
 }
 
+#[derive(Deserialize)]
+pub struct UpdateEmailForm {
+    pub email: String,
+}
+
+pub async fn update_email(
+    State(state): State<AppState>,
+    _user: AuthUser,
+    Path(id): Path<i64>,
+    Form(form): Form<UpdateEmailForm>,
+) -> Result<impl IntoResponse, AppError> {
+    let db = state.db.clone();
+    db.call(move |conn| {
+        crate::db::users::update_email(conn, id, &form.email)?;
+        Ok(())
+    })
+    .await?;
+
+    Ok(Redirect::to("/admin/users"))
+}
+
 pub async fn delete_user(
     State(state): State<AppState>,
     auth: AuthUser,

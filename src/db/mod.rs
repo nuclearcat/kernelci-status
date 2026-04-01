@@ -1,6 +1,7 @@
 pub mod config;
 pub mod endpoints;
 pub mod history;
+pub mod incidents;
 pub mod maintenance;
 pub mod schema;
 pub mod sessions;

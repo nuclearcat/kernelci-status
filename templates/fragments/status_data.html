@@ -10,6 +10,28 @@
     </div>
 </div>
 
+{% if !active_incidents.is_empty() %}
+<div class="incidents-notice">
+    <div class="maintenance-notice-icon">&#9888;</div>
+    <div class="maintenance-notice-body">
+        <strong>Active Incidents</strong>
+        {% for inc in active_incidents %}
+        <div class="incident-notice-item">
+            <span class="badge badge-{{ inc.severity_css }}">{{ inc.severity }}</span>
+            <span class="incident-notice-title">{{ inc.title }}</span>
+            <span class="badge badge-incident-{{ inc.status }}">{{ inc.status }}</span>
+            {% if let Some(user) = inc.assigned_username.as_deref() %}
+            <small class="incident-notice-assignee">Assigned: {{ user }}</small>
+            {% endif %}
+            {% if let Some(msg) = inc.public_message.as_deref() %}
+            <p class="incident-notice-message">{{ msg }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 {% if !active_maintenance.is_empty() %}
 <div class="maintenance-notice maintenance-active">
     <div class="maintenance-notice-icon">&#9888;</div>

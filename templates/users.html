@@ -27,6 +27,7 @@
     <thead>
         <tr>
             <th>Username</th>
+            <th>Email</th>
             <th>Created</th>
             <th>Actions</th>
         </tr>
@@ -35,10 +36,12 @@
         {% for u in users %}
         <tr>
             <td>{{ u.username }}</td>
+            <td>{{ u.email.as_deref().unwrap_or("—") }}</td>
             <td>{{ u.created_at }}</td>
             <td>
                 <div class="action-group">
-                    <button class="btn-sm outline" onclick="this.closest('td').querySelector('.pw-form').toggleAttribute('hidden')">Change password</button>
+                    <button class="btn-sm outline" onclick="this.closest('td').querySelector('.pw-form').toggleAttribute('hidden')">Password</button>
+                    <button class="btn-sm outline" onclick="this.closest('td').querySelector('.email-form').toggleAttribute('hidden')">Email</button>
                     <form method="post" action="/admin/users/delete/{{ u.id }}" style="display:inline">
                         <button type="submit" class="btn-sm outline secondary" onclick="return confirm('Delete user {{ u.username }}?')">Delete</button>
                     </form>
@@ -50,9 +53,18 @@
                         <button type="button" class="btn-sm outline secondary" onclick="this.closest('.pw-form').setAttribute('hidden','')">Cancel</button>
                     </div>
                 </form>
+                <form method="post" action="/admin/users/email/{{ u.id }}" class="email-form" hidden>
+                    <div class="inline-form">
+                        <input type="email" name="email" placeholder="user@example.com" value="{{ u.email.as_deref().unwrap_or("") }}" class="input-sm">
+                        <button type="submit" class="btn-sm">Save</button>
+                        <button type="button" class="btn-sm outline secondary" onclick="this.closest('.email-form').setAttribute('hidden','')">Cancel</button>
+                    </div>
+                </form>
             </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
+
+<p><small>Set email addresses for users who should receive incident notifications with action links.</small></p>
 {% endblock %}

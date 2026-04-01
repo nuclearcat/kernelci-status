@@ -3,6 +3,7 @@ pub mod dashboard;
 pub mod endpoints;
 pub mod help;
 pub mod history;
+pub mod incidents;
 pub mod maintenance;
 pub mod login;
 pub mod notifications;
@@ -44,6 +45,8 @@ pub fn router(state: AppState) -> Router {
         .route("/", axum::routing::get(status::status_page))
         .route("/status", axum::routing::get(status::status_page))
         .route("/status/data", axum::routing::get(status::status_data))
+        // Public incident token actions (no auth)
+        .route("/incident/action/{token}", axum::routing::get(incidents::incident_token_action))
         // Login/logout (public)
         .route("/login", axum::routing::get(login::login_page))
         .route("/login", axum::routing::post(login::login_submit))
@@ -95,6 +98,38 @@ pub fn router(state: AppState) -> Router {
             axum::routing::post(maintenance::delete_maintenance),
         )
         .route(
+            "/admin/incidents",
+            axum::routing::get(incidents::incidents_page),
+        )
+        .route(
+            "/admin/incidents/create",
+            axum::routing::post(incidents::create_incident),
+        )
+        .route(
+            "/admin/incidents/{id}",
+            axum::routing::get(incidents::incident_detail),
+        )
+        .route(
+            "/admin/incidents/{id}/update-status",
+            axum::routing::post(incidents::update_incident_status),
+        )
+        .route(
+            "/admin/incidents/{id}/comment",
+            axum::routing::post(incidents::add_comment),
+        )
+        .route(
+            "/admin/incidents/{id}/public-message",
+            axum::routing::post(incidents::update_public_message),
+        )
+        .route(
+            "/admin/incidents/{id}/handover",
+            axum::routing::post(incidents::handover_incident),
+        )
+        .route(
+            "/admin/incidents/{id}/postmortem",
+            axum::routing::post(incidents::save_postmortem),
+        )
+        .route(
             "/admin/notifications",
             axum::routing::get(notifications::notifications_page),
         )
@@ -119,6 +154,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/admin/users/password/{id}",
             axum::routing::post(users::change_password),
+        )
+        .route(
+            "/admin/users/email/{id}",
+            axum::routing::post(users::update_email),
         )
         .route(
             "/admin/users/delete/{id}",
