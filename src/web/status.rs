@@ -82,6 +82,19 @@ pub struct IncidentBanner {
     pub public_message: Option<String>,
 }
 
+/// A past event (resolved incident or outage) for the history section.
+pub struct HistoryEvent {
+    pub event_type: String,  // "incident" or "outage"
+    pub title: String,
+    pub severity: String,
+    pub severity_css: String,
+    pub endpoint_name: String,
+    pub created_at: String,
+    pub resolved_at: String,
+    pub duration: String,
+    pub postmortem: Option<String>,
+}
+
 /// Data fragment returned by /status/data.
 #[derive(Template)]
 #[template(path = "fragments/status_data.html")]
@@ -93,6 +106,7 @@ struct StatusDataTemplate {
     active_maintenance: Vec<MaintenanceBanner>,
     upcoming_maintenance: Vec<MaintenanceBanner>,
     active_incidents: Vec<IncidentBanner>,
+    past_events: Vec<HistoryEvent>,
 }
 
 /// Serve the page shell (header + spinner + footer). Data loaded via HTMX.
@@ -128,7 +142,7 @@ pub async fn status_data(
     let active_range = range_cfg.label.to_string();
 
     let db = state.db.clone();
-    let (groups, active_maintenance, upcoming_maintenance, active_incidents): (Vec<ServiceGroup>, Vec<MaintenanceBanner>, Vec<MaintenanceBanner>, Vec<IncidentBanner>) = db
+    let (groups, active_maintenance, upcoming_maintenance, active_incidents, past_events): (Vec<ServiceGroup>, Vec<MaintenanceBanner>, Vec<MaintenanceBanner>, Vec<IncidentBanner>, Vec<HistoryEvent>) = db
         .call(move |conn| {
             let endpoints = crate::db::endpoints::list_all(conn)?;
 
@@ -329,7 +343,85 @@ pub async fn status_data(
                 })
                 .collect();
 
-            Ok((result, active_banners, upcoming_banners, incident_banners))
+            // Build past events: resolved incidents + outage periods from state_history
+            let mut past_events: Vec<HistoryEvent> = Vec::new();
+
+            // 1) Resolved incidents (last 90 days)
+            let resolved_incs = crate::db::incidents::list_recent_resolved(conn, 90)?;
+            // Collect incident endpoint_id+start pairs so we can deduplicate outages
+            let incident_keys: std::collections::HashSet<(i64, String)> = resolved_incs
+                .iter()
+                .map(|inc| (inc.endpoint_id, inc.created_at.clone()))
+                .collect();
+
+            for inc in resolved_incs {
+                let ep_name = endpoints
+                    .iter()
+                    .find(|e| e.id == inc.endpoint_id)
+                    .map(|e| match &e.subname {
+                        Some(sub) => format!("{} ({})", e.name, sub),
+                        None => e.name.clone(),
+                    })
+                    .unwrap_or_else(|| format!("Endpoint #{}", inc.endpoint_id));
+                let sev_css = match inc.severity.as_str() {
+                    "critical" => "critical",
+                    _ => "warning",
+                };
+                let duration = compute_duration(
+                    &inc.created_at,
+                    inc.resolved_at.as_deref().unwrap_or(&inc.created_at),
+                );
+                past_events.push(HistoryEvent {
+                    event_type: "incident".to_string(),
+                    title: inc.title,
+                    severity: inc.severity,
+                    severity_css: sev_css.to_string(),
+                    endpoint_name: ep_name,
+                    created_at: inc.created_at,
+                    resolved_at: inc.resolved_at.unwrap_or_default(),
+                    duration,
+                    postmortem: inc.postmortem,
+                });
+            }
+
+            // 2) Outage periods from state_history (CRITICAL only, last 90 days)
+            let outages = crate::db::history::list_outage_periods(conn, 90)?;
+            for outage in outages {
+                // Skip outages that already have a matching incident (same endpoint, overlapping time)
+                let dominated = incident_keys.iter().any(|(eid, inc_start)| {
+                    *eid == outage.endpoint_id && inc_start.as_str() <= outage.start_time.as_str()
+                });
+                if dominated {
+                    continue;
+                }
+
+                let ep_name = endpoints
+                    .iter()
+                    .find(|e| e.id == outage.endpoint_id)
+                    .map(|e| match &e.subname {
+                        Some(sub) => format!("{} ({})", e.name, sub),
+                        None => e.name.clone(),
+                    })
+                    .unwrap_or_else(|| format!("Endpoint #{}", outage.endpoint_id));
+                let end = outage.end_time.as_deref().unwrap_or(&outage.start_time);
+                let duration = compute_duration(&outage.start_time, end);
+                past_events.push(HistoryEvent {
+                    event_type: "outage".to_string(),
+                    title: format!("{} outage", ep_name),
+                    severity: "critical".to_string(),
+                    severity_css: "critical".to_string(),
+                    endpoint_name: ep_name,
+                    created_at: outage.start_time,
+                    resolved_at: outage.end_time.unwrap_or_default(),
+                    duration,
+                    postmortem: None,
+                });
+            }
+
+            // Sort by resolved_at descending (most recent first)
+            past_events.sort_by(|a, b| b.resolved_at.cmp(&a.resolved_at));
+
+            Ok((result, active_banners, upcoming_banners, incident_banners, past_events))
         })
         .await?;
 
@@ -362,6 +454,7 @@ pub async fn status_data(
             active_maintenance,
             upcoming_maintenance,
             active_incidents,
+            past_events,
         }
         .render()
         .unwrap_or_default(),
@@ -456,6 +549,30 @@ fn merge_slot_state(a: &str, b: &str) -> String {
         "MAINTENANCE".to_string()
     } else {
         worse.to_string()
+    }
+}
+
+/// Human-readable duration between two "%Y-%m-%d %H:%M:%S" timestamps.
+fn compute_duration(start: &str, end: &str) -> String {
+    let parse = |s: &str| chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S").ok();
+    match (parse(start), parse(end)) {
+        (Some(s), Some(e)) => {
+            let mins = (e - s).num_minutes();
+            if mins < 1 {
+                "< 1 min".to_string()
+            } else if mins < 60 {
+                format!("{mins} min")
+            } else if mins < 1440 {
+                let h = mins / 60;
+                let m = mins % 60;
+                if m == 0 { format!("{h}h") } else { format!("{h}h {m}m") }
+            } else {
+                let d = mins / 1440;
+                let h = (mins % 1440) / 60;
+                if h == 0 { format!("{d}d") } else { format!("{d}d {h}h") }
+            }
+        }
+        _ => "—".to_string(),
     }
 }
 

@@ -139,6 +139,39 @@
     <span class="legend-item"><span class="legend-dot dot-maintenance"></span> Maintenance</span>
     <span class="legend-item"><span class="legend-dot dot-ok-maintenance"></span> OK + Maintenance</span>
     <span class="legend-item"><span class="legend-dot dot-critical-maintenance"></span> Down + Maintenance</span>
+    <span class="legend-item legend-tz">All times in UTC</span>
 </div>
+
+{% if !past_events.is_empty() %}
+<details class="incident-history-section">
+    <summary>Past Events (last 90 days)</summary>
+    <div class="incident-history-list">
+        {% for ev in past_events %}
+        <div class="incident-history-row">
+            <div class="incident-history-header">
+                <span class="badge badge-{{ ev.severity_css }}">{{ ev.severity }}</span>
+                {% if ev.event_type == "incident" %}
+                <span class="badge badge-incident-type">incident</span>
+                {% else %}
+                <span class="badge badge-outage-type">outage</span>
+                {% endif %}
+                <strong>{{ ev.title }}</strong>
+                {% if ev.event_type == "outage" %}
+                {% else %}
+                <span class="incident-history-endpoint">{{ ev.endpoint_name }}</span>
+                {% endif %}
+            </div>
+            <div class="incident-history-meta">
+                <span>{{ ev.created_at }} &mdash; {{ ev.resolved_at }} UTC</span>
+                <span class="incident-history-duration">Duration: {{ ev.duration }}</span>
+            </div>
+            {% if let Some(pm) = ev.postmortem.as_deref() %}
+            <p class="incident-history-postmortem">{{ pm }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</details>
+{% endif %}
 
 </div>

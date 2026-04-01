@@ -253,6 +253,55 @@ pub fn get_since(
     rows.collect()
 }
 
+/// A resolved outage period extracted from state_history transitions.
+#[derive(Debug, Clone)]
+pub struct OutagePeriod {
+    pub endpoint_id: i64,
+    pub start_time: String,
+    pub end_time: Option<String>,
+}
+
+/// Find resolved outage periods (CRITICAL → non-CRITICAL transitions) in the last N days.
+/// Only returns outages that have ended (i.e. endpoint recovered). Uses SQL window functions.
+pub fn list_outage_periods(conn: &Connection, days: i64) -> rusqlite::Result<Vec<OutagePeriod>> {
+    let cutoff = format!("-{days} days");
+    let mut stmt = conn.prepare(
+        "WITH ranked AS (
+            SELECT endpoint_id, timestamp, state,
+                   LAG(state) OVER (PARTITION BY endpoint_id ORDER BY timestamp) AS prev_state
+            FROM state_history
+            WHERE timestamp > datetime('now', ?1)
+        ),
+        starts AS (
+            SELECT endpoint_id, timestamp AS start_time
+            FROM ranked
+            WHERE state IN ('CRITICAL', 'CRITICAL_MAINTENANCE')
+              AND (prev_state IS NULL OR prev_state NOT IN ('CRITICAL', 'CRITICAL_MAINTENANCE'))
+        ),
+        ends AS (
+            SELECT endpoint_id, timestamp AS end_time
+            FROM ranked
+            WHERE state NOT IN ('CRITICAL', 'CRITICAL_MAINTENANCE')
+              AND prev_state IN ('CRITICAL', 'CRITICAL_MAINTENANCE')
+        )
+        SELECT s.endpoint_id, s.start_time,
+               (SELECT MIN(e.end_time) FROM ends e
+                WHERE e.endpoint_id = s.endpoint_id AND e.end_time > s.start_time) AS end_time
+        FROM starts s
+        ORDER BY s.start_time DESC",
+    )?;
+    let rows = stmt.query_map(params![cutoff], |row| {
+        Ok(OutagePeriod {
+            endpoint_id: row.get(0)?,
+            start_time: row.get(1)?,
+            end_time: row.get(2)?,
+        })
+    })?;
+    // Only return resolved outages (end_time is not null)
+    let all: Vec<OutagePeriod> = rows.collect::<Result<Vec<_>, _>>()?;
+    Ok(all.into_iter().filter(|o| o.end_time.is_some()).collect())
+}
+
 fn map_row(row: &rusqlite::Row) -> rusqlite::Result<HistoryEntry> {
     Ok(HistoryEntry {
         id: row.get(0)?,

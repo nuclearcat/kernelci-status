@@ -999,6 +999,11 @@ article[id] pre code {
     flex-shrink: 0;
 }
 
+.legend-tz {
+    font-style: italic;
+    opacity: 0.7;
+}
+
 /* ── Loading spinner ── */
 
 .status-spinner {
@@ -1143,6 +1148,87 @@ article[id] pre code {
 
 .incident-header {
     margin-bottom: 1rem;
+}
+
+/* ── Public incident history (collapsed) ── */
+
+.incident-history-section {
+    margin-top: 1.25rem;
+    border-color: var(--kci-border);
+}
+
+.incident-history-section > summary {
+    color: var(--kci-text-muted);
+    font-size: 0.85rem;
+    background: #f8f9fb;
+}
+
+.incident-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.incident-history-row {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--kci-gray);
+}
+
+.incident-history-row:last-child {
+    border-bottom: none;
+}
+
+.incident-history-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+}
+
+.incident-history-header strong {
+    color: var(--kci-text);
+}
+
+.incident-history-endpoint {
+    color: var(--kci-text-muted);
+    font-size: 0.8rem;
+}
+
+.incident-history-meta {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.78rem;
+    color: var(--kci-text-muted);
+    margin-top: 0.15rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.incident-history-duration {
+    font-weight: 500;
+}
+
+.badge-incident-type {
+    background: var(--kci-blue-dark);
+    font-size: 0.65rem;
+    padding: 0.1rem 0.4rem;
+}
+
+.badge-outage-type {
+    background: var(--kci-red);
+    font-size: 0.65rem;
+    padding: 0.1rem 0.4rem;
+}
+
+.incident-history-postmortem {
+    font-size: 0.82rem;
+    color: var(--kci-text);
+    margin: 0.3rem 0 0;
+    padding: 0.4rem 0.6rem;
+    background: #f8f9fb;
+    border-left: 3px solid var(--kci-border);
+    border-radius: 0 4px 4px 0;
+    line-height: 1.5;
 }
 
 /* HTMX indicator: hidden by default, shown when request in flight */
