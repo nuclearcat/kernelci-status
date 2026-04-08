@@ -12,11 +12,12 @@ pub struct Endpoint {
     pub condition: Option<String>,
     pub critical: bool,
     pub enabled: bool,
+    pub nodata_is_critical: bool,
 }
 
 pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<Endpoint>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, subname, endpoint, check_type, selector, condition, critical, enabled
+        "SELECT id, name, subname, endpoint, check_type, selector, condition, critical, enabled, nodata_is_critical
          FROM endpoints ORDER BY name, subname",
     )?;
     let rows = stmt.query_map([], |row| {
@@ -30,6 +31,7 @@ pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<Endpoint>> {
             condition: row.get(6)?,
             critical: row.get(7)?,
             enabled: row.get(8)?,
+            nodata_is_critical: row.get(9)?,
         })
     })?;
     rows.collect()
@@ -37,7 +39,7 @@ pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<Endpoint>> {
 
 pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<Endpoint>> {
     conn.query_row(
-        "SELECT id, name, subname, endpoint, check_type, selector, condition, critical, enabled
+        "SELECT id, name, subname, endpoint, check_type, selector, condition, critical, enabled, nodata_is_critical
          FROM endpoints WHERE id = ?1",
         params![id],
         |row| {
@@ -51,6 +53,7 @@ pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<Endpoint
                 condition: row.get(6)?,
                 critical: row.get(7)?,
                 enabled: row.get(8)?,
+                nodata_is_critical: row.get(9)?,
             })
         },
     )
@@ -59,7 +62,7 @@ pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<Endpoint
 
 pub fn list_enabled(conn: &Connection) -> rusqlite::Result<Vec<Endpoint>> {
     let mut stmt = conn.prepare(
-        "SELECT id, name, subname, endpoint, check_type, selector, condition, critical, enabled
+        "SELECT id, name, subname, endpoint, check_type, selector, condition, critical, enabled, nodata_is_critical
          FROM endpoints WHERE enabled = 1 ORDER BY name, subname",
     )?;
     let rows = stmt.query_map([], |row| {
@@ -73,6 +76,7 @@ pub fn list_enabled(conn: &Connection) -> rusqlite::Result<Vec<Endpoint>> {
             condition: row.get(6)?,
             critical: row.get(7)?,
             enabled: row.get(8)?,
+            nodata_is_critical: row.get(9)?,
         })
     })?;
     rows.collect()
@@ -87,12 +91,13 @@ pub struct NewEndpoint {
     pub condition: Option<String>,
     pub critical: bool,
     pub enabled: bool,
+    pub nodata_is_critical: bool,
 }
 
 pub fn insert(conn: &Connection, ep: &NewEndpoint) -> rusqlite::Result<i64> {
     conn.execute(
-        "INSERT INTO endpoints (name, subname, endpoint, check_type, selector, condition, critical, enabled)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        "INSERT INTO endpoints (name, subname, endpoint, check_type, selector, condition, critical, enabled, nodata_is_critical)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
             ep.name,
             ep.subname,
@@ -102,6 +107,7 @@ pub fn insert(conn: &Connection, ep: &NewEndpoint) -> rusqlite::Result<i64> {
             ep.condition,
             ep.critical,
             ep.enabled,
+            ep.nodata_is_critical,
         ],
     )?;
     Ok(conn.last_insert_rowid())
@@ -110,7 +116,7 @@ pub fn insert(conn: &Connection, ep: &NewEndpoint) -> rusqlite::Result<i64> {
 pub fn update(conn: &Connection, id: i64, ep: &NewEndpoint) -> rusqlite::Result<bool> {
     let rows = conn.execute(
         "UPDATE endpoints SET name=?1, subname=?2, endpoint=?3, check_type=?4,
-         selector=?5, condition=?6, critical=?7, enabled=?8 WHERE id=?9",
+         selector=?5, condition=?6, critical=?7, enabled=?8, nodata_is_critical=?9 WHERE id=?10",
         params![
             ep.name,
             ep.subname,
@@ -120,6 +126,7 @@ pub fn update(conn: &Connection, id: i64, ep: &NewEndpoint) -> rusqlite::Result<
             ep.condition,
             ep.critical,
             ep.enabled,
+            ep.nodata_is_critical,
             id,
         ],
     )?;

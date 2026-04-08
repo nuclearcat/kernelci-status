@@ -46,6 +46,7 @@ pub struct EndpointForm {
     pub condition: Option<String>,
     pub critical: Option<String>,
     pub enabled: Option<String>,
+    pub nodata_is_critical: Option<String>,
 }
 
 impl EndpointForm {
@@ -59,6 +60,7 @@ impl EndpointForm {
             condition: self.condition.clone().filter(|s| !s.is_empty()),
             critical: self.critical.as_deref() == Some("on"),
             enabled: self.enabled.as_deref() != Some("off"),
+            nodata_is_critical: self.nodata_is_critical.as_deref() == Some("on"),
         }
     }
 }
@@ -114,6 +116,7 @@ pub async fn clone_endpoint(
             condition: ep.condition,
             critical: ep.critical,
             enabled: false,
+            nodata_is_critical: ep.nodata_is_critical,
         };
         crate::db::endpoints::insert(conn, &new)?;
         Ok(())
@@ -153,6 +156,7 @@ pub async fn test_endpoint(
         condition: form.condition.clone().filter(|s| !s.is_empty()),
         critical: form.critical.as_deref() == Some("on"),
         enabled: true,
+        nodata_is_critical: form.nodata_is_critical.as_deref() == Some("on"),
     };
 
     let ctx = CheckContext {

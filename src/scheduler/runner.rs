@@ -84,6 +84,14 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
 
             let mut result = run_check_with_timeout(&ep, &ctx).await;
 
+            // Promote NO_DATA → CRITICAL if the endpoint requires it
+            if ep.nodata_is_critical && result.state == EndpointState::NoData {
+                result.state = EndpointState::Critical;
+                if result.message.is_none() {
+                    result.message = Some("No data (treated as critical)".to_string());
+                }
+            }
+
             // Retry on non-OK state (separate retry counts for warnings vs critical)
             let retries_for_state = match result.state {
                 EndpointState::Ok => 0,

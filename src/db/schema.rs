@@ -12,7 +12,8 @@ pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
             selector TEXT,
             condition TEXT,
             critical BOOLEAN NOT NULL DEFAULT 0,
-            enabled BOOLEAN NOT NULL DEFAULT 1
+            enabled BOOLEAN NOT NULL DEFAULT 1,
+            nodata_is_critical BOOLEAN NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS state_history (
@@ -71,6 +72,7 @@ pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
     migrate_maintenance_windows(conn)?;
     migrate_incidents(conn)?;
     migrate_maintenance_reminder(conn)?;
+    migrate_nodata_is_critical(conn)?;
 
     Ok(())
 }
@@ -306,6 +308,22 @@ fn migrate_maintenance_reminder(conn: &Connection) -> rusqlite::Result<()> {
     if !has_col {
         conn.execute_batch(
             "ALTER TABLE maintenance_windows ADD COLUMN reminder_sent BOOLEAN NOT NULL DEFAULT 0",
+        )?;
+    }
+    Ok(())
+}
+
+fn migrate_nodata_is_critical(conn: &Connection) -> rusqlite::Result<()> {
+    let has_col = {
+        let mut stmt = conn.prepare("PRAGMA table_info(endpoints)")?;
+        let names: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?;
+        names.iter().any(|n| n == "nodata_is_critical")
+    };
+    if !has_col {
+        conn.execute_batch(
+            "ALTER TABLE endpoints ADD COLUMN nodata_is_critical BOOLEAN NOT NULL DEFAULT 0",
         )?;
     }
     Ok(())
