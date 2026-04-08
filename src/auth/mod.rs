@@ -92,10 +92,7 @@ impl FromRequestParts<AppState> for AuthUser {
 }
 
 /// Extractor for API routes that returns 401 instead of redirect.
-#[allow(dead_code)]
-pub struct ApiAuth {
-    pub user_id: i64,
-}
+pub struct ApiAuth;
 
 impl FromRequestParts<AppState> for ApiAuth {
     type Rejection = StatusCode;
@@ -122,10 +119,8 @@ impl FromRequestParts<AppState> for ApiAuth {
                 let session = db
                     .call(move |conn| crate::db::sessions::get_valid(conn, &t))
                     .await;
-                if let Ok(Some(s)) = session {
-                    return Ok(ApiAuth {
-                        user_id: s.user_id,
-                    });
+                if let Ok(Some(_)) = session {
+                    return Ok(ApiAuth);
                 }
             }
         }
@@ -149,7 +144,7 @@ impl FromRequestParts<AppState> for ApiAuth {
                 .unwrap_or(false);
 
             if valid {
-                return Ok(ApiAuth { user_id: 0 });
+                return Ok(ApiAuth);
             }
         }
 

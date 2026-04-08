@@ -70,6 +70,7 @@ pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
     migrate_add_check_type(conn)?;
     migrate_maintenance_windows(conn)?;
     migrate_incidents(conn)?;
+    migrate_maintenance_reminder(conn)?;
 
     Ok(())
 }
@@ -291,6 +292,22 @@ fn migrate_incidents(conn: &Connection) -> rusqlite::Result<()> {
         conn.execute_batch("ALTER TABLE users ADD COLUMN email TEXT")?;
     }
 
+    Ok(())
+}
+
+fn migrate_maintenance_reminder(conn: &Connection) -> rusqlite::Result<()> {
+    let has_col = {
+        let mut stmt = conn.prepare("PRAGMA table_info(maintenance_windows)")?;
+        let names: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?;
+        names.iter().any(|n| n == "reminder_sent")
+    };
+    if !has_col {
+        conn.execute_batch(
+            "ALTER TABLE maintenance_windows ADD COLUMN reminder_sent BOOLEAN NOT NULL DEFAULT 0",
+        )?;
+    }
     Ok(())
 }
 

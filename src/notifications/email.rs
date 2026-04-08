@@ -194,13 +194,11 @@ pub async fn send_notification(
 }
 
 /// Data needed to compose an incident email.
-#[allow(dead_code)]
 pub struct IncidentEmailData {
     pub title: String,
     pub endpoint_name: String,
     pub severity: String,
     pub status: String,
-    pub created_at: String,
 }
 
 pub struct ActionLink {
@@ -313,6 +311,93 @@ pub async fn send_incident_email(
         .map_err(|e| e.to_string())?;
 
     transport.send(email).await.map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Data for a maintenance reminder email.
+pub struct MaintenanceReminderData {
+    pub window_name: String,
+    pub start_time: String,
+    pub end_time: String,
+    pub endpoint_names: Vec<String>,
+}
+
+/// Send a maintenance reminder email to notification recipients.
+pub async fn send_maintenance_reminder(
+    config: &HashMap<String, String>,
+    data: &MaintenanceReminderData,
+) -> Result<(), String> {
+    let transport = build_transport(config)?;
+    let from = from_mailbox(config)?;
+    let recipients = recipient_mailboxes(config)?;
+
+    let subject = format!(
+        "[maintenance] {} — starting in less than 1 hour",
+        data.window_name
+    );
+
+    let endpoints_html = if data.endpoint_names.is_empty() {
+        "None specified".to_string()
+    } else {
+        data.endpoint_names.join(", ")
+    };
+
+    let html_body = format!(
+        r#"<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f3f4f6;">
+<div style="max-width:600px;margin:24px auto;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
+  <div style="background:#001B71;padding:16px 24px;">
+    <h1 style="margin:0;color:#fff;font-size:18px;">KernelCI Maintenance Reminder</h1>
+  </div>
+  <div style="padding:24px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+      <span style="font-size:28px;">&#128336;</span>
+      <div>
+        <div style="font-size:18px;font-weight:600;color:#111;">{name}</div>
+        <div style="font-size:14px;color:#6b7280;">Starting in less than 1 hour</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0;border:1px solid #e5e7eb;border-radius:6px;">
+      <tr>
+        <td style="padding:6px 12px;color:#6b7280;">Start</td>
+        <td style="padding:6px 12px;font-weight:600;">{start_time} UTC</td>
+      </tr>
+      <tr style="background:#f9fafb;">
+        <td style="padding:6px 12px;color:#6b7280;">End</td>
+        <td style="padding:6px 12px;font-weight:600;">{end_time} UTC</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 12px;color:#6b7280;">Affected</td>
+        <td style="padding:6px 12px;">{endpoints}</td>
+      </tr>
+    </table>
+    <div style="font-size:12px;color:#9ca3af;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:12px;">
+      Sent by KernelCI Status Monitoring
+    </div>
+  </div>
+</div>
+</body>
+</html>"#,
+        name = data.window_name,
+        start_time = data.start_time,
+        end_time = data.end_time,
+        endpoints = endpoints_html,
+    );
+
+    for recipient in &recipients {
+        let email = Message::builder()
+            .from(from.clone())
+            .to(recipient.clone())
+            .subject(&subject)
+            .header(ContentType::TEXT_HTML)
+            .body(html_body.clone())
+            .map_err(|e| e.to_string())?;
+
+        transport.send(email).await.map_err(|e| e.to_string())?;
+    }
+
     Ok(())
 }
 

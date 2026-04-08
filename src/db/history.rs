@@ -215,25 +215,6 @@ pub fn get_last_check_timestamp(conn: &Connection) -> rusqlite::Result<Option<St
         None => Ok(None),
     }
 }
-
-/// Get all history entries for an endpoint from the last N hours.
-#[allow(dead_code)]
-pub fn get_last_hours(
-    conn: &Connection,
-    endpoint_id: i64,
-    hours: i64,
-) -> rusqlite::Result<Vec<HistoryEntry>> {
-    let offset = format!("-{hours} hours");
-    let mut stmt = conn.prepare(
-        "SELECT id, endpoint_id, timestamp, value, state, message
-         FROM state_history
-         WHERE endpoint_id = ?1 AND timestamp >= datetime('now', ?2)
-         ORDER BY timestamp ASC",
-    )?;
-    let rows = stmt.query_map(params![endpoint_id, offset], map_row)?;
-    rows.collect()
-}
-
 /// Get all history entries for an endpoint since a given timestamp.
 /// The caller supplies the exact cutoff so that the DB query and the
 /// slot-mapping logic share the same time reference (prevents stale

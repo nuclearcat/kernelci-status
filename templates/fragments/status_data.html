@@ -40,7 +40,7 @@
         {% for mw in active_maintenance %}
         <div class="maintenance-notice-item">
             <span class="maintenance-notice-name">{{ mw.name }}</span>
-            <span class="maintenance-notice-time">{{ mw.start_time }} &mdash; {{ mw.end_time }} UTC</span>
+            <span class="maintenance-notice-time mw-time" data-start="{{ mw.start_time }}" data-end="{{ mw.end_time }}">{{ mw.start_time }} &mdash; {{ mw.end_time }} UTC</span>
             {% if !mw.endpoint_names.is_empty() %}
             <span class="maintenance-notice-endpoints">Affected: {{ mw.endpoint_names.join(", ") }}</span>
             {% endif %}
@@ -58,7 +58,7 @@
         {% for mw in upcoming_maintenance %}
         <div class="maintenance-notice-item">
             <span class="maintenance-notice-name">{{ mw.name }}</span>
-            <span class="maintenance-notice-time">{{ mw.start_time }} &mdash; {{ mw.end_time }} UTC</span>
+            <span class="maintenance-notice-time mw-time" data-start="{{ mw.start_time }}" data-end="{{ mw.end_time }}">{{ mw.start_time }} &mdash; {{ mw.end_time }} UTC</span>
             {% if !mw.endpoint_names.is_empty() %}
             <span class="maintenance-notice-endpoints">Affected: {{ mw.endpoint_names.join(", ") }}</span>
             {% endif %}
@@ -139,7 +139,7 @@
     <span class="legend-item"><span class="legend-dot dot-maintenance"></span> Maintenance</span>
     <span class="legend-item"><span class="legend-dot dot-ok-maintenance"></span> OK + Maintenance</span>
     <span class="legend-item"><span class="legend-dot dot-critical-maintenance"></span> Down + Maintenance</span>
-    <span class="legend-item legend-tz">All times in UTC</span>
+    <span class="legend-item legend-tz" id="tz-label">All times in UTC</span>
 </div>
 
 {% if !past_events.is_empty() %}
@@ -174,4 +174,26 @@
 </details>
 {% endif %}
 
+<script>
+(function() {
+    var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    var fmt = function(utcStr) {
+        var d = new Date(utcStr.replace(' ', 'T') + 'Z');
+        if (isNaN(d)) return utcStr;
+        return d.toLocaleString(undefined, {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false
+        });
+    };
+    document.querySelectorAll('.mw-time').forEach(function(el) {
+        var s = el.getAttribute('data-start');
+        var e = el.getAttribute('data-end');
+        if (s && e) {
+            el.textContent = fmt(s) + ' \u2014 ' + fmt(e) + ' (' + tz + ')';
+        }
+    });
+    var tzLabel = document.getElementById('tz-label');
+    if (tzLabel) tzLabel.textContent = 'Times in ' + tz;
+})();
+</script>
 </div>

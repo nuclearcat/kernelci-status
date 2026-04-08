@@ -126,6 +126,18 @@ pub fn update(conn: &Connection, id: i64, ep: &NewEndpoint) -> rusqlite::Result<
     Ok(rows > 0)
 }
 
+pub fn get_ids_by_names(conn: &Connection, names: &[String]) -> rusqlite::Result<Vec<i64>> {
+    let mut ids = Vec::new();
+    let mut stmt = conn.prepare("SELECT id FROM endpoints WHERE name = ?1")?;
+    for name in names {
+        let row_ids = stmt
+            .query_map(params![name], |row| row.get::<_, i64>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        ids.extend(row_ids);
+    }
+    Ok(ids)
+}
+
 pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<bool> {
     // Delete associated history first
     conn.execute(
