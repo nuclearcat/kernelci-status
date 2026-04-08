@@ -42,6 +42,7 @@
         <tr><td><strong>Selector</strong></td><td>{{ endpoint.selector.as_deref().unwrap_or("-") }}</td></tr>
         <tr><td><strong>Condition</strong></td><td>{{ endpoint.condition.as_deref().unwrap_or("-") }}</td></tr>
         <tr><td><strong>Critical</strong></td><td>{% if endpoint.critical %}Yes{% else %}No{% endif %}</td></tr>
+        <tr><td><strong>No data behavior</strong></td><td>{{ endpoint.nodata_behavior }}</td></tr>
         <tr><td><strong>Enabled</strong></td><td>{% if endpoint.enabled %}Yes{% else %}No{% endif %}</td></tr>
     </table>
 </article>

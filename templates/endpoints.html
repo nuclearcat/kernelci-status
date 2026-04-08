@@ -47,14 +47,20 @@
                 <input type="text" name="condition" placeholder=">90, <7, diff(12h)>100, absdiff(12h)>50">
             </label>
         </div>
+        <div class="grid">
+            <label>
+                No data behavior <span class="help-icon" tabindex="0">?<span class="help-tooltip">How to treat <b>NO_DATA</b> results (e.g. endpoint unreachable or returns no metrics).<br><br><code>No data</code> — report as NO_DATA (default)<br><code>Warning</code> — promote to WARNING<br><code>Critical</code> — promote to CRITICAL<br><br>Useful for endpoints that must always return data.</span></span>
+                <select name="nodata_behavior">
+                    <option value="nodata">No data (default)</option>
+                    <option value="warning">Warning</option>
+                    <option value="critical">Critical</option>
+                </select>
+            </label>
+        </div>
         <fieldset>
             <label>
                 <input type="checkbox" name="critical">
                 Critical service <span class="help-icon" tabindex="0">?<span class="help-tooltip">Mark this endpoint as a <b>critical production service</b>. Critical endpoints are highlighted on the dashboard and in notifications with a <code>[CRITICAL]</code> prefix so on-call knows to prioritize them.<br><br>Use for production services. Leave unchecked for staging or non-essential monitors.</span></span>
-            </label>
-            <label>
-                <input type="checkbox" name="nodata_is_critical">
-                No data is critical <span class="help-icon" tabindex="0">?<span class="help-tooltip">Treat <b>NO_DATA</b> as <b>CRITICAL</b>. When enabled, if a check returns no data (e.g. the endpoint is unreachable or returns no metrics), it will be reported as CRITICAL instead of NO_DATA.<br><br>Useful for endpoints that must always return data.</span></span>
             </label>
             <label>
                 <input type="checkbox" name="enabled" checked>
@@ -83,7 +89,7 @@
             <th>Selector <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">What to extract from the response.<br><br><code>(metric,label=val)</code> — Prometheus<br>SQL query — PostgreSQL<br>Label selector — Kubernetes<br>Container name — Docker<br><code>-</code> means not applicable</span></span></th>
             <th>Condition <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">Alert threshold on measured value.<br><br><code>&gt;90</code> — warn above 90<br><code>&lt;7</code> — warn below 7<br><code>diff(12h)&gt;100</code> — warn on change<br><code>absdiff(12h)&gt;50</code> — warn on change in either direction<br><code>-</code> means no condition (default states only)</span></span></th>
             <th>Critical <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">Production-critical service. Gets highlighted in dashboard and flagged <code>[CRITICAL]</code> in notifications.</span></span></th>
-            <th>NoData=Crit <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">When enabled, NO_DATA results are treated as CRITICAL failures.</span></span></th>
+            <th>No data <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">How NO_DATA results are treated: kept as-is, promoted to WARNING, or promoted to CRITICAL.</span></span></th>
             <th>Enabled <span class="help-icon help-icon-th" tabindex="0">?<span class="help-tooltip help-tooltip-down">Whether the scheduler actively checks this endpoint every 15 minutes.</span></span></th>
             <th>Actions</th>
         </tr>
@@ -99,7 +105,7 @@
             <td>{{ ep.selector.as_deref().unwrap_or("-") }}</td>
             <td>{{ ep.condition.as_deref().unwrap_or("-") }}</td>
             <td>{% if ep.critical %}Yes{% else %}No{% endif %}</td>
-            <td>{% if ep.nodata_is_critical %}Yes{% else %}No{% endif %}</td>
+            <td>{{ ep.nodata_behavior }}</td>
             <td>{% if ep.enabled %}Yes{% else %}No{% endif %}</td>
             <td>
                 <div class="action-group">
@@ -156,9 +162,16 @@
                     </div>
                     <fieldset>
                         <label><input type="checkbox" name="critical" {% if ep.critical %}checked{% endif %}> Critical</label>
-                        <label><input type="checkbox" name="nodata_is_critical" {% if ep.nodata_is_critical %}checked{% endif %}> No data is critical</label>
                         <label><input type="checkbox" name="enabled" {% if ep.enabled %}checked{% endif %}> Enabled</label>
                     </fieldset>
+                    <label>
+                        No data behavior
+                        <select name="nodata_behavior">
+                            <option value="nodata" {% if ep.nodata_behavior == "nodata" %}selected{% endif %}>No data (default)</option>
+                            <option value="warning" {% if ep.nodata_behavior == "warning" %}selected{% endif %}>Warning</option>
+                            <option value="critical" {% if ep.nodata_behavior == "critical" %}selected{% endif %}>Critical</option>
+                        </select>
+                    </label>
                     <div class="action-group">
                         <button type="submit" class="btn-sm">Save</button>
                         <button type="button" class="outline btn-sm"

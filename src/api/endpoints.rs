@@ -82,7 +82,7 @@ pub struct CreateEndpointRequest {
     pub condition: Option<String>,
     pub critical: Option<bool>,
     pub enabled: Option<bool>,
-    pub nodata_is_critical: Option<bool>,
+    pub nodata_behavior: Option<String>,
 }
 
 pub async fn create_endpoint(
@@ -99,7 +99,11 @@ pub async fn create_endpoint(
         condition: req.condition,
         critical: req.critical.unwrap_or(false),
         enabled: req.enabled.unwrap_or(true),
-        nodata_is_critical: req.nodata_is_critical.unwrap_or(false),
+        nodata_behavior: match req.nodata_behavior.as_deref() {
+            Some("warning") => "warning".to_string(),
+            Some("critical") => "critical".to_string(),
+            _ => "nodata".to_string(),
+        },
     };
     let db = state.db.clone();
     let id = db
@@ -123,7 +127,11 @@ pub async fn update_endpoint(
         condition: req.condition,
         critical: req.critical.unwrap_or(false),
         enabled: req.enabled.unwrap_or(true),
-        nodata_is_critical: req.nodata_is_critical.unwrap_or(false),
+        nodata_behavior: match req.nodata_behavior.as_deref() {
+            Some("warning") => "warning".to_string(),
+            Some("critical") => "critical".to_string(),
+            _ => "nodata".to_string(),
+        },
     };
     let db = state.db.clone();
     let updated = db

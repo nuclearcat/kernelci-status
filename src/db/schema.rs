@@ -13,7 +13,7 @@ pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
             condition TEXT,
             critical BOOLEAN NOT NULL DEFAULT 0,
             enabled BOOLEAN NOT NULL DEFAULT 1,
-            nodata_is_critical BOOLEAN NOT NULL DEFAULT 0
+            nodata_behavior TEXT NOT NULL DEFAULT 'nodata'
         );
 
         CREATE TABLE IF NOT EXISTS state_history (
@@ -72,7 +72,7 @@ pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
     migrate_maintenance_windows(conn)?;
     migrate_incidents(conn)?;
     migrate_maintenance_reminder(conn)?;
-    migrate_nodata_is_critical(conn)?;
+    migrate_nodata_behavior(conn)?;
 
     Ok(())
 }
@@ -313,19 +313,32 @@ fn migrate_maintenance_reminder(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
-fn migrate_nodata_is_critical(conn: &Connection) -> rusqlite::Result<()> {
-    let has_col = {
-        let mut stmt = conn.prepare("PRAGMA table_info(endpoints)")?;
-        let names: Vec<String> = stmt
-            .query_map([], |row| row.get::<_, String>(1))?
-            .collect::<Result<Vec<_>, _>>()?;
-        names.iter().any(|n| n == "nodata_is_critical")
-    };
-    if !has_col {
-        conn.execute_batch(
-            "ALTER TABLE endpoints ADD COLUMN nodata_is_critical BOOLEAN NOT NULL DEFAULT 0",
-        )?;
+fn migrate_nodata_behavior(conn: &Connection) -> rusqlite::Result<()> {
+    let mut stmt = conn.prepare("PRAGMA table_info(endpoints)")?;
+    let names: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let has_old = names.iter().any(|n| n == "nodata_is_critical");
+    let has_new = names.iter().any(|n| n == "nodata_behavior");
+
+    if has_new {
+        return Ok(());
     }
+
+    // Add the new text column
+    conn.execute_batch(
+        "ALTER TABLE endpoints ADD COLUMN nodata_behavior TEXT NOT NULL DEFAULT 'nodata'",
+    )?;
+
+    if has_old {
+        // Migrate old boolean: 1 → "critical", 0 → "nodata"
+        conn.execute_batch(
+            "UPDATE endpoints SET nodata_behavior = 'critical' WHERE nodata_is_critical = 1",
+        )?;
+        conn.execute_batch("ALTER TABLE endpoints DROP COLUMN nodata_is_critical")?;
+    }
+
     Ok(())
 }
 

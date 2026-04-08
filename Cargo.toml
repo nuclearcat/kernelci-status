@@ -1,6 +1,6 @@
 [package]
 name = "kernelci-status"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 
 [dependencies]
@@ -71,4 +71,4 @@ clap = { version = "4", features = ["derive"] }
 thiserror = "2"
 
 # Misc
-axum-extra = { version = "0.12", features = ["cookie"] }
+axum-extra = { version = "0.12", features = ["cookie", "form"] }
