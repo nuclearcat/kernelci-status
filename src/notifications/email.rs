@@ -320,6 +320,8 @@ pub struct MaintenanceReminderData {
     pub start_time: String,
     pub end_time: String,
     pub endpoint_names: Vec<String>,
+    pub is_deploy: bool,
+    pub changelog: Option<String>,
 }
 
 /// Send a maintenance reminder email to notification recipients.
@@ -331,15 +333,31 @@ pub async fn send_maintenance_reminder(
     let from = from_mailbox(config)?;
     let recipients = recipient_mailboxes(config)?;
 
+    let deploy_label = if data.is_deploy { " (Deploy)" } else { "" };
+
     let subject = format!(
-        "[maintenance] {} — starting in less than 1 hour",
-        data.window_name
+        "[maintenance] {}{} — starting in less than 1 hour",
+        data.window_name, deploy_label
     );
 
     let endpoints_html = if data.endpoint_names.is_empty() {
         "None specified".to_string()
     } else {
         data.endpoint_names.join(", ")
+    };
+
+    let changelog_html = match &data.changelog {
+        Some(cl) if !cl.trim().is_empty() => {
+            let escaped = cl
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+                .replace('\n', "<br>");
+            format!(
+                r#"<tr><td style="padding:6px 12px;color:#6b7280;vertical-align:top;">Changelog</td><td style="padding:6px 12px;font-family:monospace;font-size:13px;">{escaped}</td></tr>"#
+            )
+        }
+        _ => String::new(),
     };
 
     let html_body = format!(
@@ -372,6 +390,7 @@ pub async fn send_maintenance_reminder(
         <td style="padding:6px 12px;color:#6b7280;">Affected</td>
         <td style="padding:6px 12px;">{endpoints}</td>
       </tr>
+      {changelog_section}
     </table>
     <div style="font-size:12px;color:#9ca3af;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:12px;">
       Sent by KernelCI Status Monitoring
@@ -384,6 +403,7 @@ pub async fn send_maintenance_reminder(
         start_time = data.start_time,
         end_time = data.end_time,
         endpoints = endpoints_html,
+        changelog_section = changelog_html,
     );
 
     for recipient in &recipients {

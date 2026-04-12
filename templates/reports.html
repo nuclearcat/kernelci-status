@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block username %}{{ username }}{% endblock %}
+{% block title %}Reports — KernelCI Status{% endblock %}
+
+{% block content %}
+<h2>Uptime Reports</h2>
+
+{% if !error.is_empty() %}
+<div class="error-message">{{ error }}</div>
+{% endif %}
+{% if !success.is_empty() %}
+<div class="success-message">{{ success }}</div>
+{% endif %}
+
+<article>
+    <header><h3>Preview Report</h3></header>
+    <p>Generate an uptime and incident report for the board of directors.</p>
+    <div class="grid">
+        <form method="post" action="/admin/reports/preview">
+            <input type="hidden" name="report_type" value="weekly">
+            <button type="submit">Preview Weekly Report</button>
+        </form>
+        <form method="post" action="/admin/reports/preview">
+            <input type="hidden" name="report_type" value="monthly">
+            <button type="submit">Preview Monthly Report</button>
+        </form>
+    </div>
+</article>
+
+<article>
+    <header><h3>Scheduled Reports</h3></header>
+    <p>Configure automatic report generation. Reports will be available for review on the scheduled day.</p>
+    <form method="post" action="/admin/reports/schedule">
+        <fieldset>
+            <legend>Weekly Report</legend>
+            <label>
+                <input type="checkbox" name="report_weekly_enabled" {% if report_weekly_enabled %}checked{% endif %}>
+                Enable weekly report generation
+            </label>
+            <label>
+                Day of week (0=Monday, 6=Sunday)
+                <select name="report_weekly_day">
+                    <option value="0" {% if report_weekly_day == "0" %}selected{% endif %}>Monday</option>
+                    <option value="1" {% if report_weekly_day == "1" %}selected{% endif %}>Tuesday</option>
+                    <option value="2" {% if report_weekly_day == "2" %}selected{% endif %}>Wednesday</option>
+                    <option value="3" {% if report_weekly_day == "3" %}selected{% endif %}>Thursday</option>
+                    <option value="4" {% if report_weekly_day == "4" %}selected{% endif %}>Friday</option>
+                    <option value="5" {% if report_weekly_day == "5" %}selected{% endif %}>Saturday</option>
+                    <option value="6" {% if report_weekly_day == "6" %}selected{% endif %}>Sunday</option>
+                </select>
+            </label>
+        </fieldset>
+
+        <fieldset>
+            <legend>Monthly Report</legend>
+            <label>
+                <input type="checkbox" name="report_monthly_enabled" {% if report_monthly_enabled %}checked{% endif %}>
+                Enable monthly report generation
+            </label>
+            <label>
+                Day of month (1–28)
+                <input type="number" name="report_monthly_day" value="{{ report_monthly_day }}" min="1" max="28">
+            </label>
+        </fieldset>
+
+        <button type="submit">Save Schedule</button>
+    </form>
+</article>
+{% endblock %}

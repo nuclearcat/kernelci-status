@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Incident #{{ incident.id }} — KernelCI Status{% endblock %}
+{% block username %}{{ username }}{% endblock %}
+
+{% block content %}
+<h2>
+    Incident #{{ incident.id }}
+    <span class="badge badge-incident-{{ incident.status }}">{{ incident.status }}</span>
+    <span class="badge badge-{{ incident.severity }}">{{ incident.severity }}</span>
+</h2>
+
+<div class="incident-header">
+    <table>
+        <tbody>
+            <tr><td><strong>Title</strong></td><td>{{ incident.title }}{% if incident.auto_created %} <small>(auto-created)</small>{% endif %}</td></tr>
+            <tr><td><strong>Endpoint</strong></td><td>{{ endpoint_name }}</td></tr>
+            <tr><td><strong>Assigned To</strong></td><td>{{ assigned_username.as_deref().unwrap_or("Unassigned") }}</td></tr>
+            <tr><td><strong>Created</strong></td><td><code>{{ incident.created_at }}</code> UTC</td></tr>
+            {% if let Some(ack) = incident.acknowledged_at.as_deref() %}
+            <tr><td><strong>Acknowledged</strong></td><td><code>{{ ack }}</code> UTC</td></tr>
+            {% endif %}
+            {% if let Some(res) = incident.resolved_at.as_deref() %}
+            <tr><td><strong>Resolved</strong></td><td><code>{{ res }}</code> UTC</td></tr>
+            {% endif %}
+            {% if let Some(msg) = incident.public_message.as_deref() %}
+            <tr><td><strong>Public Message</strong></td><td>{{ msg }}</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{% if incident.status != "resolved" %}
+<div class="grid">
+    <article>
+        <header><strong>Update Status</strong></header>
+        <form method="post" action="/admin/incidents/{{ incident.id }}/update-status">
+            <select name="status">
+                <option value="acknowledged"{% if incident.status == "acknowledged" %} selected{% endif %}>Acknowledged</option>
+                <option value="investigating"{% if incident.status == "investigating" %} selected{% endif %}>Investigating</option>
+                <option value="identified"{% if incident.status == "identified" %} selected{% endif %}>Identified</option>
+                <option value="monitoring"{% if incident.status == "monitoring" %} selected{% endif %}>Monitoring</option>
+                <option value="resolved">Resolved</option>
+            </select>
+            <button type="submit" class="btn-sm">Update</button>
+        </form>
+    </article>
+
+    <article>
+        <header><strong>Hand Over</strong></header>
+        <form method="post" action="/admin/incidents/{{ incident.id }}/handover">
+            <select name="user_id">
+                {% for u in users %}
+                <option value="{{ u.id }}">{{ u.username }}{% if let Some(e) = u.email.as_deref() %} ({{ e }}){% endif %}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn-sm">Hand Over</button>
+        </form>
+    </article>
+</div>
+
+<article>
+    <header><strong>Public Message</strong></header>
+    <form method="post" action="/admin/incidents/{{ incident.id }}/public-message">
+        <textarea name="public_message" placeholder="Visible on the public status page">{{ incident.public_message.as_deref().unwrap_or("") }}</textarea>
+        <button type="submit" class="btn-sm">Save</button>
+    </form>
+</article>
+{% endif %}
+
+<article>
+    <header><strong>Add Comment</strong></header>
+    <form method="post" action="/admin/incidents/{{ incident.id }}/comment">
+        <textarea name="message" placeholder="Internal comment (not visible on public page)" required></textarea>
+        <button type="submit" class="btn-sm">Add Comment</button>
+    </form>
+</article>
+
+{% if incident.status == "resolved" %}
+<article>
+    <header><strong>Postmortem</strong></header>
+    <form method="post" action="/admin/incidents/{{ incident.id }}/postmortem">
+        <textarea name="postmortem" rows="6" placeholder="Root cause analysis, lessons learned...">{{ incident.postmortem.as_deref().unwrap_or("") }}</textarea>
+        <button type="submit" class="btn-sm">Save Postmortem</button>
+    </form>
+</article>
+{% endif %}
+
+<h3>Timeline</h3>
+<div class="incident-timeline">
+    {% for row in updates %}
+    <div class="incident-timeline-entry">
+        <div class="incident-timeline-dot{% if row.update.update_type == "auto_resolve" %} dot-ok{% else if row.update.update_type == "status_change" %} dot-status{% else if row.update.update_type == "handover" %} dot-handover{% else %} dot-comment{% endif %}"></div>
+        <div class="incident-timeline-content">
+            <div class="incident-timeline-meta">
+                <code>{{ row.update.created_at }}</code>
+                {% if let Some(uname) = row.username.as_deref() %}
+                <strong>{{ uname }}</strong>
+                {% else %}
+                <strong>System</strong>
+                {% endif %}
+                <span class="badge badge-incident-type-{{ row.update.update_type }}">{{ row.update.update_type }}</span>
+            </div>
+            {% if let Some(status) = row.update.status.as_deref() %}
+            <div>Status: <span class="badge badge-incident-{{ status }}">{{ status }}</span></div>
+            {% endif %}
+            {% if let Some(msg) = row.update.message.as_deref() %}
+            <p class="incident-timeline-message">{{ msg }}</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    {% if updates.is_empty() %}
+    <p>No timeline entries yet.</p>
+    {% endif %}
+</div>
+
+<p><a href="/admin/incidents">&larr; Back to incidents</a></p>
+{% endblock %}

@@ -749,6 +749,44 @@ article[id] pre code {
     width: 100%;
 }
 
+.changelog-details {
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 0.85rem;
+}
+.changelog-details summary {
+    cursor: pointer;
+    font-size: 0.82rem;
+    opacity: 0.8;
+}
+.changelog-details .changelog-md {
+    margin-top: 0.4rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--kci-card-bg, rgba(0,0,0,0.05));
+    border-radius: 6px;
+    line-height: 1.5;
+}
+.changelog-md h3, .changelog-md h4, .changelog-md h5 {
+    margin: 0.5rem 0 0.2rem;
+    font-size: 0.9rem;
+}
+.changelog-md ul {
+    margin: 0.2rem 0;
+    padding-left: 1.2rem;
+}
+.changelog-md li {
+    margin-bottom: 0.1rem;
+}
+.changelog-md code {
+    font-size: 0.82em;
+    padding: 0.1em 0.35em;
+    background: rgba(0,0,0,0.08);
+    border-radius: 3px;
+}
+.changelog-md p {
+    margin: 0.25rem 0;
+}
+
 /* Service rows */
 /* ── Range toggle ── */
 

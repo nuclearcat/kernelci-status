@@ -70,6 +70,8 @@ pub struct MaintenanceBanner {
     pub start_time: String,
     pub end_time: String,
     pub endpoint_names: Vec<String>,
+    pub is_deploy: bool,
+    pub changelog: Option<String>,
 }
 
 /// An active incident for display on the public status page.
@@ -82,9 +84,9 @@ pub struct IncidentBanner {
     pub public_message: Option<String>,
 }
 
-/// A past event (resolved incident or outage) for the history section.
+/// A past event (resolved incident, outage, or deploy) for the history section.
 pub struct HistoryEvent {
-    pub event_type: String,  // "incident" or "outage"
+    pub event_type: String,  // "incident", "outage", or "deploy"
     pub title: String,
     pub severity: String,
     pub severity_css: String,
@@ -93,6 +95,7 @@ pub struct HistoryEvent {
     pub resolved_at: String,
     pub duration: String,
     pub postmortem: Option<String>,
+    pub changelog: Option<String>,
 }
 
 /// Data fragment returned by /status/data.
@@ -310,6 +313,8 @@ pub async fn status_data(
                             start_time: w.start_time,
                             end_time: w.end_time,
                             endpoint_names: names,
+                            is_deploy: w.is_deploy,
+                            changelog: w.changelog,
                         }
                     })
                     .collect()
@@ -381,6 +386,7 @@ pub async fn status_data(
                     resolved_at: inc.resolved_at.unwrap_or_default(),
                     duration,
                     postmortem: inc.postmortem,
+                    changelog: None,
                 });
             }
 
@@ -415,6 +421,42 @@ pub async fn status_data(
                     resolved_at: outage.end_time.unwrap_or_default(),
                     duration,
                     postmortem: None,
+                    changelog: None,
+                });
+            }
+
+            // 3) Past deploy maintenance windows (last 90 days)
+            let past_deploys = crate::db::maintenance::get_past_deploys(conn, &now_str, 90)?;
+            for deploy in past_deploys {
+                let ep_names: Vec<String> = deploy
+                    .endpoint_ids
+                    .iter()
+                    .filter_map(|eid| {
+                        endpoints.iter().find(|ep| ep.id == *eid).map(|ep| {
+                            match &ep.subname {
+                                Some(sub) => format!("{} ({})", ep.name, sub),
+                                None => ep.name.clone(),
+                            }
+                        })
+                    })
+                    .collect();
+                let ep_display = if ep_names.is_empty() {
+                    String::new()
+                } else {
+                    ep_names.join(", ")
+                };
+                let duration = compute_duration(&deploy.start_time, &deploy.end_time);
+                past_events.push(HistoryEvent {
+                    event_type: "deploy".to_string(),
+                    title: deploy.name,
+                    severity: "ok".to_string(),
+                    severity_css: "ok".to_string(),
+                    endpoint_name: ep_display,
+                    created_at: deploy.start_time,
+                    resolved_at: deploy.end_time,
+                    duration,
+                    postmortem: None,
+                    changelog: deploy.changelog,
                 });
             }
 

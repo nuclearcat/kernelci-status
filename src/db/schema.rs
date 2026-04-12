@@ -73,6 +73,7 @@ pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
     migrate_incidents(conn)?;
     migrate_maintenance_reminder(conn)?;
     migrate_nodata_behavior(conn)?;
+    migrate_deploy_changelog(conn)?;
 
     Ok(())
 }
@@ -339,6 +340,23 @@ fn migrate_nodata_behavior(conn: &Connection) -> rusqlite::Result<()> {
         conn.execute_batch("ALTER TABLE endpoints DROP COLUMN nodata_is_critical")?;
     }
 
+    Ok(())
+}
+
+fn migrate_deploy_changelog(conn: &Connection) -> rusqlite::Result<()> {
+    let mut stmt = conn.prepare("PRAGMA table_info(maintenance_windows)")?;
+    let names: Vec<String> = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if !names.iter().any(|n| n == "is_deploy") {
+        conn.execute_batch(
+            "ALTER TABLE maintenance_windows ADD COLUMN is_deploy BOOLEAN NOT NULL DEFAULT 0",
+        )?;
+    }
+    if !names.iter().any(|n| n == "changelog") {
+        conn.execute_batch("ALTER TABLE maintenance_windows ADD COLUMN changelog TEXT")?;
+    }
     Ok(())
 }
 

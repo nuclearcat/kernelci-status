@@ -39,10 +39,16 @@
         <strong>Maintenance in progress</strong>
         {% for mw in active_maintenance %}
         <div class="maintenance-notice-item">
-            <span class="maintenance-notice-name">{{ mw.name }}</span>
+            <span class="maintenance-notice-name">{{ mw.name }}{% if mw.is_deploy %} <span class="badge badge-ok">deploy</span>{% endif %}</span>
             <span class="maintenance-notice-time mw-time" data-start="{{ mw.start_time }}" data-end="{{ mw.end_time }}">{{ mw.start_time }} &mdash; {{ mw.end_time }} UTC</span>
             {% if !mw.endpoint_names.is_empty() %}
             <span class="maintenance-notice-endpoints">Affected: {{ mw.endpoint_names.join(", ") }}</span>
+            {% endif %}
+            {% if let Some(cl) = mw.changelog.as_deref() %}
+            <details class="changelog-details">
+                <summary>View changelog</summary>
+                <div class="changelog-md">{{ cl }}</div>
+            </details>
             {% endif %}
         </div>
         {% endfor %}
@@ -57,10 +63,16 @@
         <strong>Scheduled maintenance</strong>
         {% for mw in upcoming_maintenance %}
         <div class="maintenance-notice-item">
-            <span class="maintenance-notice-name">{{ mw.name }}</span>
+            <span class="maintenance-notice-name">{{ mw.name }}{% if mw.is_deploy %} <span class="badge badge-ok">deploy</span>{% endif %}</span>
             <span class="maintenance-notice-time mw-time" data-start="{{ mw.start_time }}" data-end="{{ mw.end_time }}">{{ mw.start_time }} &mdash; {{ mw.end_time }} UTC</span>
             {% if !mw.endpoint_names.is_empty() %}
             <span class="maintenance-notice-endpoints">Affected: {{ mw.endpoint_names.join(", ") }}</span>
+            {% endif %}
+            {% if let Some(cl) = mw.changelog.as_deref() %}
+            <details class="changelog-details">
+                <summary>View changelog</summary>
+                <div class="changelog-md">{{ cl }}</div>
+            </details>
             {% endif %}
         </div>
         {% endfor %}
@@ -152,12 +164,15 @@
                 <span class="badge badge-{{ ev.severity_css }}">{{ ev.severity }}</span>
                 {% if ev.event_type == "incident" %}
                 <span class="badge badge-incident-type">incident</span>
+                {% else if ev.event_type == "deploy" %}
+                <span class="badge badge-ok">deploy</span>
                 {% else %}
                 <span class="badge badge-outage-type">outage</span>
                 {% endif %}
                 <strong>{{ ev.title }}</strong>
-                {% if ev.event_type == "outage" %}
-                {% else %}
+                {% if ev.event_type == "incident" %}
+                <span class="incident-history-endpoint">{{ ev.endpoint_name }}</span>
+                {% else if ev.event_type == "deploy" && !ev.endpoint_name.is_empty() %}
                 <span class="incident-history-endpoint">{{ ev.endpoint_name }}</span>
                 {% endif %}
             </div>
@@ -167,6 +182,12 @@
             </div>
             {% if let Some(pm) = ev.postmortem.as_deref() %}
             <p class="incident-history-postmortem">{{ pm }}</p>
+            {% endif %}
+            {% if let Some(cl) = ev.changelog.as_deref() %}
+            <details class="changelog-details">
+                <summary>View changelog</summary>
+                <div class="changelog-md">{{ cl }}</div>
+            </details>
             {% endif %}
         </div>
         {% endfor %}
@@ -194,6 +215,43 @@
     });
     var tzLabel = document.getElementById('tz-label');
     if (tzLabel) tzLabel.textContent = 'Times in ' + tz;
+
+    // Minimal markdown renderer for changelog blocks
+    function renderMd(text) {
+        var esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        var lines = esc.split('\n');
+        var html = [];
+        var inList = false;
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            var m;
+            if ((m = line.match(/^(#{1,3})\s+(.*)/))) {
+                if (inList) { html.push('</ul>'); inList = false; }
+                var lvl = m[1].length;
+                html.push('<h' + (lvl+2) + '>' + inline(m[2]) + '</h' + (lvl+2) + '>');
+            } else if ((m = line.match(/^\s*[-*]\s+(.*)/))) {
+                if (!inList) { html.push('<ul>'); inList = true; }
+                html.push('<li>' + inline(m[1]) + '</li>');
+            } else if (line.trim() === '') {
+                if (inList) { html.push('</ul>'); inList = false; }
+                html.push('');
+            } else {
+                if (inList) { html.push('</ul>'); inList = false; }
+                html.push('<p>' + inline(line) + '</p>');
+            }
+        }
+        if (inList) html.push('</ul>');
+        return html.join('\n');
+    }
+    function inline(s) {
+        return s
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/`(.+?)`/g, '<code>$1</code>')
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" rel="noopener">$1</a>');
+    }
+    document.querySelectorAll('.changelog-md').forEach(function(el) {
+        el.innerHTML = renderMd(el.textContent);
+    });
 })();
 </script>
 </div>

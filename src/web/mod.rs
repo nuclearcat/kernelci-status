@@ -7,6 +7,7 @@ pub mod incidents;
 pub mod maintenance;
 pub mod login;
 pub mod notifications;
+pub mod reports;
 pub mod status;
 pub mod users;
 
@@ -170,6 +171,18 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/admin/history/export",
             axum::routing::post(history::export_old),
+        )
+        .route(
+            "/admin/reports",
+            axum::routing::get(reports::reports_page),
+        )
+        .route(
+            "/admin/reports/preview",
+            axum::routing::post(reports::report_preview),
+        )
+        .route(
+            "/admin/reports/schedule",
+            axum::routing::post(reports::save_report_schedule),
         )
         .route("/admin/help", axum::routing::get(help::help_page))
         // Embedded static files

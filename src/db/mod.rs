@@ -3,6 +3,7 @@ pub mod endpoints;
 pub mod history;
 pub mod incidents;
 pub mod maintenance;
+pub mod reports;
 pub mod schema;
 pub mod sessions;
 pub mod users;

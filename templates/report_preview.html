@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block username %}{{ username }}{% endblock %}
+{% block title %}{{ report_type }} Report — KernelCI Status{% endblock %}
+
+{% block content %}
+<style>
+    @media print {
+        .admin-nav, .no-print { display: none !important; }
+        main { margin: 0; padding: 0; }
+        article { break-inside: avoid; }
+    }
+    .report-header { text-align: center; margin-bottom: 2rem; }
+    .report-header h2 { margin-bottom: 0.25rem; }
+    .report-meta { color: var(--muted-color); font-size: 0.9rem; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin: 1rem 0; }
+    .summary-card { text-align: center; padding: 1rem; border-radius: 8px; background: var(--card-background-color); border: 1px solid var(--muted-border-color); }
+    .summary-card .value { font-size: 2rem; font-weight: bold; }
+    .summary-card .label { font-size: 0.85rem; color: var(--muted-color); }
+    .uptime-ok { color: #2e7d32; }
+    .uptime-warning { color: #e65100; }
+    .uptime-critical { color: #c62828; }
+    .severity-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+    .severity-critical { background: #ffcdd2; color: #c62828; }
+    .severity-warning { background: #fff3e0; color: #e65100; }
+    .status-resolved { color: #2e7d32; }
+    .status-detected, .status-acknowledged { color: #e65100; }
+</style>
+
+<div class="no-print" style="margin-bottom: 1rem;">
+    <button onclick="window.print()" class="outline">Print / Export PDF</button>
+    <a href="/admin/reports" class="outline" role="button" style="margin-left: 0.5rem;">Back to Reports</a>
+</div>
+
+<div class="report-header">
+    <h2>KernelCI Infrastructure — {{ report_type }} Report</h2>
+    <div class="report-meta">
+        Period: {{ period_start }} to {{ period_end }} | Generated: {{ generated_at }}
+    </div>
+</div>
+
+<article>
+    <header><h3>Executive Summary</h3></header>
+    <div class="summary-grid">
+        <div class="summary-card">
+            <div class="value uptime-{{ overall_css }}">{{ overall_uptime }}</div>
+            <div class="label">Overall Uptime</div>
+        </div>
+        <div class="summary-card">
+            <div class="value uptime-{{ overall_css }}">{{ overall_sla }}</div>
+            <div class="label">SLA Uptime (excl. maintenance)</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ total_incidents }}</div>
+            <div class="label">Total Incidents</div>
+        </div>
+        <div class="summary-card">
+            <div class="value uptime-critical">{{ critical_incidents }}</div>
+            <div class="label">Critical Incidents</div>
+        </div>
+        <div class="summary-card">
+            <div class="value uptime-ok">{{ resolved_incidents }}</div>
+            <div class="label">Resolved</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ total_maintenance }}</div>
+            <div class="label">Maintenance Windows</div>
+        </div>
+    </div>
+</article>
+
+<article>
+    <header><h3>Service Uptime</h3></header>
+    {% if services.is_empty() %}
+    <p>No service data available for this period.</p>
+    {% else %}
+    <table>
+        <thead>
+            <tr>
+                <th>Service</th>
+                <th>Uptime</th>
+                <th>SLA Uptime</th>
+                <th>Total Checks</th>
+                <th>Critical</th>
+                <th>Warnings</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in services %}
+            <tr>
+                <td>{{ s.name }}</td>
+                <td class="uptime-{{ s.uptime_css }}"><strong>{{ s.uptime_pct }}</strong></td>
+                <td class="uptime-{{ s.uptime_css }}">{{ s.sla_uptime_pct }}</td>
+                <td>{{ s.total_checks }}</td>
+                <td>{% if s.critical_checks > 0 %}<span class="uptime-critical">{{ s.critical_checks }}</span>{% else %}0{% endif %}</td>
+                <td>{% if s.warning_checks > 0 %}<span class="uptime-warning">{{ s.warning_checks }}</span>{% else %}0{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</article>
+
+<article>
+    <header><h3>Incidents</h3></header>
+    {% if incidents.is_empty() %}
+    <p>No incidents during this period.</p>
+    {% else %}
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Service</th>
+                <th>Started</th>
+                <th>Resolved</th>
+                <th>Duration</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for i in incidents %}
+            <tr>
+                <td>{{ i.title }}</td>
+                <td><span class="severity-badge severity-{{ i.severity_css }}">{{ i.severity }}</span></td>
+                <td class="status-{{ i.status }}">{{ i.status }}</td>
+                <td>{{ i.endpoint_name }}</td>
+                <td>{{ i.created_at }}</td>
+                <td>{{ i.resolved_at }}</td>
+                <td>{{ i.duration }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</article>
+
+<article>
+    <header><h3>Maintenance Windows</h3></header>
+    {% if maintenance_windows.is_empty() %}
+    <p>No planned maintenance during this period.</p>
+    {% else %}
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Affected Services</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in maintenance_windows %}
+            <tr>
+                <td>{{ m.name }}</td>
+                <td>{{ m.start_time }}</td>
+                <td>{{ m.end_time }}</td>
+                <td>{{ m.endpoints }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</article>
+{% endblock %}

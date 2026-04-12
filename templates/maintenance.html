@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Maintenance Windows{% endblock %}
+{% block username %}{{ username }}{% endblock %}
+
+{% block content %}
+<h2>Maintenance Windows</h2>
+<p>Schedule maintenance windows to mark endpoints as under planned maintenance. Checks still run during maintenance — the actual health state is recorded alongside the maintenance indicator.</p>
+
+<details>
+    <summary role="button" class="secondary">Schedule New Maintenance</summary>
+    <form method="post" action="/admin/maintenance/add">
+        <label>
+            Description
+            <input type="text" name="name" required placeholder="API server upgrade">
+        </label>
+        <div class="grid">
+            <label>
+                Start Time (UTC)
+                <input type="datetime-local" name="start_time" id="new-start" required min="{{ now.replace(" ", "T") }}">
+            </label>
+            <label>
+                End Time (UTC)
+                <input type="datetime-local" name="end_time" id="new-end" required min="{{ now.replace(" ", "T") }}">
+            </label>
+        </div>
+        <script>
+        (function() {
+            var fmt = function(d) { return d.toISOString().slice(0,16); };
+            var s = new Date(Date.now() + 24*3600*1000);
+            var e = new Date(Date.now() + 25*3600*1000);
+            document.getElementById('new-start').value = fmt(s);
+            document.getElementById('new-end').value = fmt(e);
+        })();
+        </script>
+        <fieldset>
+            <legend>Affected Endpoints</legend>
+            <div class="checkbox-grid">
+                {% for name in unique_names %}
+                <label>
+                    <input type="checkbox" name="endpoint_names" value="{{ name }}">
+                    {{ name }}
+                </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+        <label>
+            <input type="checkbox" name="is_deploy" onchange="this.closest('form').querySelector('.deploy-changelog').hidden=!this.checked">
+            Is this a deploy?
+        </label>
+        <div class="deploy-changelog" hidden>
+            <label>
+                Changelog
+                <small>(Markdown supported. Example: repo, release tag, list of changes)</small>
+                <textarea name="changelog" rows="6" placeholder="## kernelci-api v2024.04.1 (abc1234)
+- Fixed node caching (#1234)
+- Added test filter support
+
+## kernelci-pipeline v2024.04.1 (def5678)
+- Updated timeout handling"></textarea>
+            </label>
+        </div>
+        <button type="submit">Schedule Maintenance</button>
+    </form>
+</details>
+
+<table>
+    <thead>
+        <tr>
+            <th>Status</th>
+            <th>Description</th>
+            <th>Start (UTC)</th>
+            <th>End (UTC)</th>
+            <th>Endpoints</th>
+            <th>Changelog</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for w in windows %}
+        <tr>
+            <td>
+                {% if w.end_time.as_str() < now.as_str() %}
+                <span class="badge badge-nodata">Past</span>
+                {% else if w.start_time.as_str() <= now.as_str() %}
+                <span class="badge badge-maintenance">Active</span>
+                {% else %}
+                <span class="badge badge-ok">Scheduled</span>
+                {% endif %}
+            </td>
+            <td>
+                {{ w.name }}
+                {% if w.is_deploy %}<span class="badge badge-ok">deploy</span>{% endif %}
+            </td>
+            <td><code>{{ w.start_time }}</code></td>
+            <td><code>{{ w.end_time }}</code></td>
+            <td>
+                {% for name in w.endpoint_names %}
+                    <small>{{ name }}</small>{% if !loop.last %}, {% endif %}
+                {% endfor %}
+                {% if w.endpoint_names.is_empty() %}<small>None</small>{% endif %}
+            </td>
+            <td>
+                {% if w.is_deploy && !w.changelog.is_empty() %}
+                <details>
+                    <summary><small>View changelog</small></summary>
+                    <div class="changelog-md">{{ w.changelog }}</div>
+                </details>
+                {% else if w.is_deploy %}
+                <small>No changelog</small>
+                {% endif %}
+            </td>
+            <td>
+                <div class="action-group">
+                    <button type="button" class="outline btn-sm" onclick="let r=this.closest('tr').nextElementSibling; r.hidden=!r.hidden">Edit</button>
+                    <form method="post" action="/admin/maintenance/delete/{{ w.id }}" style="display:inline">
+                        <button type="submit" class="outline secondary btn-sm" onclick="return confirm('Delete this maintenance window?')">Delete</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        <tr hidden>
+            <td colspan="7" class="edit-row">
+                <form method="post" action="/admin/maintenance/edit/{{ w.id }}">
+                    <label>
+                        Description
+                        <input type="text" name="name" value="{{ w.name }}" required>
+                    </label>
+                    <div class="grid">
+                        <label>
+                            Start Time (UTC)
+                            <input type="datetime-local" name="start_time" value="{{ w.start_time.replace(" ", "T") }}" required>
+                        </label>
+                        <label>
+                            End Time (UTC)
+                            <input type="datetime-local" name="end_time" value="{{ w.end_time.replace(" ", "T") }}" required>
+                        </label>
+                    </div>
+                    <fieldset>
+                        <legend>Affected Endpoints</legend>
+                        <div class="checkbox-grid">
+                            {% for name in unique_names %}
+                            <label>
+                                <input type="checkbox" name="endpoint_names" value="{{ name }}"
+                                    {% if w.endpoint_names.contains(&name) %}checked{% endif %}>
+                                {{ name }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </fieldset>
+                    <label>
+                        <input type="checkbox" name="is_deploy" {% if w.is_deploy %}checked{% endif %}
+                            onchange="this.closest('form').querySelector('.deploy-changelog').hidden=!this.checked">
+                        Is this a deploy?
+                    </label>
+                    <div class="deploy-changelog" {% if !w.is_deploy %}hidden{% endif %}>
+                        <label>
+                            Changelog
+                            <small>(Markdown supported)</small>
+                            <textarea name="changelog" rows="6">{{ w.changelog }}</textarea>
+                        </label>
+                    </div>
+                    <div class="action-group">
+                        <button type="submit" class="btn-sm">Save</button>
+                        <button type="button" class="outline btn-sm" onclick="this.closest('tr').hidden=true">Cancel</button>
+                    </div>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if windows.is_empty() %}
+<p>No maintenance windows scheduled.</p>
+{% endif %}
+
+<script>
+(function() {
+    function renderMd(text) {
+        var esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        var lines = esc.split('\n');
+        var html = [];
+        var inList = false;
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            var m;
+            if ((m = line.match(/^(#{1,3})\s+(.*)/))) {
+                if (inList) { html.push('</ul>'); inList = false; }
+                var lvl = m[1].length;
+                html.push('<h' + (lvl+2) + '>' + inline(m[2]) + '</h' + (lvl+2) + '>');
+            } else if ((m = line.match(/^\s*[-*]\s+(.*)/))) {
+                if (!inList) { html.push('<ul>'); inList = true; }
+                html.push('<li>' + inline(m[1]) + '</li>');
+            } else if (line.trim() === '') {
+                if (inList) { html.push('</ul>'); inList = false; }
+                html.push('');
+            } else {
+                if (inList) { html.push('</ul>'); inList = false; }
+                html.push('<p>' + inline(line) + '</p>');
+            }
+        }
+        if (inList) html.push('</ul>');
+        return html.join('\n');
+    }
+    function inline(s) {
+        return s
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/`(.+?)`/g, '<code>$1</code>')
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" rel="noopener">$1</a>');
+    }
+    document.querySelectorAll('.changelog-md').forEach(function(el) {
+        el.innerHTML = renderMd(el.textContent);
+    });
+})();
+</script>
+{% endblock %}
