@@ -39,7 +39,12 @@ pub async fn notification_worker(
 
         let text = format!(
             "[{}] {} → {} | {}{}",
-            if event.critical { "CRITICAL" } else { "service" },
+            match event.new_state.as_str() {
+                "CRITICAL" => "CRITICAL",
+                "WARNING" => "WARNING",
+                "OK" => "OK",
+                _ => "service",
+            },
             display_name,
             event.new_state,
             event.message.as_deref().unwrap_or(""),

@@ -111,7 +111,12 @@ pub async fn send_notification(
         None => event.endpoint_name.clone(),
     };
 
-    let severity = if event.critical { "CRITICAL" } else { "service" };
+    let severity = match event.new_state.as_str() {
+        "CRITICAL" => "CRITICAL",
+        "WARNING" => "WARNING",
+        "OK" => "OK",
+        _ => "service",
+    };
     let (state_emoji, state_color) = match event.new_state.as_str() {
         "OK" => ("\u{2705}", "#16a34a"),
         "WARNING" => ("\u{26a0}\u{fe0f}", "#ca8a04"),

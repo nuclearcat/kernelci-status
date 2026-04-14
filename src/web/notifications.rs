@@ -13,6 +13,7 @@ pub struct NotifConfig {
     pub discord_enabled: bool,
     pub discord_webhook_url: String,
     pub email_enabled: bool,
+    pub email_warnings: bool,
     pub email_to: String,
     pub textfile_enabled: bool,
     pub textfile_path: String,
@@ -27,6 +28,7 @@ impl NotifConfig {
             discord_enabled: m.get("discord_enabled").is_some_and(|v| v == "true"),
             discord_webhook_url: g("discord_webhook_url", ""),
             email_enabled: m.get("email_enabled").is_some_and(|v| v == "true"),
+            email_warnings: m.get("email_warnings").is_some_and(|v| v == "true"),
             email_to: g("email_to", ""),
             textfile_enabled: m.get("textfile_enabled").is_some_and(|v| v == "true"),
             textfile_path: g("textfile_path", ""),
@@ -66,6 +68,7 @@ pub struct NotificationForm {
     pub discord_enabled: Option<String>,
     pub discord_webhook_url: Option<String>,
     pub email_enabled: Option<String>,
+    pub email_warnings: Option<String>,
     pub email_to: Option<String>,
     pub textfile_enabled: Option<String>,
     pub textfile_path: Option<String>,
@@ -157,6 +160,7 @@ pub async fn save_notifications(
         set_toggle("discord_enabled", &form.discord_enabled)?;
         set("discord_webhook_url", form.discord_webhook_url.as_deref().unwrap_or(""))?;
         set_toggle("email_enabled", &form.email_enabled)?;
+        set_toggle("email_warnings", &form.email_warnings)?;
         set("email_to", &cleaned_emails)?;
         set_toggle("textfile_enabled", &form.textfile_enabled)?;
         set("textfile_path", form.textfile_path.as_deref().unwrap_or(""))?;

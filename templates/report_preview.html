@@ -7,8 +7,22 @@
 <style>
     @media print {
         .admin-nav, .no-print { display: none !important; }
-        main { margin: 0; padding: 0; }
-        article { break-inside: avoid; }
+        html, body { font-size: 11pt; }
+        main { margin: 0; padding: 0; max-width: 100%; }
+        main.container { max-width: 100%; padding: 0; }
+        article { break-inside: avoid; margin: 0.5rem 0; padding: 0.5rem 0; border: none; box-shadow: none; background: none; }
+        article header { padding: 0; margin: 0 0 0.3rem 0; }
+        article header h3 { margin: 0; font-size: 13pt; }
+        h2 { font-size: 16pt; }
+        .report-header { margin-bottom: 0.8rem; }
+        .report-header h2 { margin-bottom: 0.15rem; }
+        .summary-grid { gap: 0.4rem; margin: 0.4rem 0; }
+        .summary-card { padding: 0.4rem; }
+        .summary-card .value { font-size: 1.3rem; }
+        .summary-card .label { font-size: 0.75rem; }
+        table { font-size: 9pt; }
+        table th, table td { padding: 0.2rem 0.4rem; }
+        p { margin: 0.3rem 0; }
     }
     .report-header { text-align: center; margin-bottom: 2rem; }
     .report-header h2 { margin-bottom: 0.25rem; }
