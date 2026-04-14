@@ -11,7 +11,7 @@
     <form method="post" action="/admin/maintenance/add" id="new-maintenance-form">
         <label>
             <input type="checkbox" id="hotfix-toggle">
-            <strong>Hotfix</strong> <small>(short-notice emergency maintenance, 15 min window)</small>
+            <strong>Hotfix</strong> <small>(short-notice emergency maintenance, starts in 30 min, 15 min window)</small>
         </label>
         <label>
             Description
@@ -42,8 +42,8 @@
                 var endInput = document.getElementById('new-end');
                 if (this.checked) {
                     var now = new Date();
-                    startInput.value = fmt(now);
-                    endInput.value = fmt(new Date(now.getTime() + 15*60*1000));
+                    startInput.value = fmt(new Date(now.getTime() + 30*60*1000));
+                    endInput.value = fmt(new Date(now.getTime() + 45*60*1000));
                     if (!nameInput.value || nameInput.value === nameInput.defaultValue) {
                         nameInput.value = 'Emergency hotfix: ';
                     }
