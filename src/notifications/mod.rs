@@ -14,7 +14,6 @@ pub struct NotificationEvent {
     pub new_state: String,
     pub message: Option<String>,
     pub value: Option<String>,
-    pub critical: bool,
 }
 
 pub async fn notification_worker(

@@ -240,7 +240,6 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
                     new_state: state_str.clone(),
                     message: check_result.message,
                     value: check_result.value,
-                    critical: endpoint.critical,
                 });
             }
 
