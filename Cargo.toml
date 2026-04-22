@@ -1,6 +1,6 @@
 [package]
 name = "kernelci-status"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 
 [dependencies]
@@ -77,3 +77,10 @@ thiserror = "2"
 
 # Misc
 axum-extra = { version = "0.12", features = ["cookie", "form"] }
+
+# Local patch: rustls-acme 0.15.1 deserializes authorizations with a required
+# `token` on each Challenge, which breaks against Let's Encrypt now that
+# `dns-persist-01` (no token) is advertised. Upstream fix pending in
+# rustls-acme#92; vendor a patched copy in-tree until a release lands.
+[patch.crates-io]
+rustls-acme = { path = "vendor/rustls-acme" }
