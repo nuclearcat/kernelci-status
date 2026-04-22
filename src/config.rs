@@ -98,6 +98,8 @@ impl AppConfig {
     pub fn load(cli: Cli) -> Self {
         let toml_config = load_toml(&cli.config);
 
+        let port_was_set = cli.port.is_some()
+            || toml_config.server.as_ref().and_then(|s| s.port).is_some();
         let port = cli
             .port
             .or(toml_config.server.as_ref().and_then(|s| s.port))
@@ -134,6 +136,13 @@ impl AppConfig {
                 https_port: a.https_port.unwrap_or(443),
             })
         });
+
+        if acme.is_some() && port_was_set {
+            warn!(
+                "[server].port = {port} is ignored because [acme].enabled = true; \
+                 the daemon listens on acme.http_port and acme.https_port instead"
+            );
+        }
 
         AppConfig {
             port,
