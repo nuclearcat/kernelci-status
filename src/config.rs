@@ -9,6 +9,7 @@ pub struct TomlConfig {
     pub server: Option<ServerConfig>,
     pub database: Option<DatabaseConfig>,
     pub credentials: Option<CredentialsConfig>,
+    pub acme: Option<AcmeTomlConfig>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -27,6 +28,27 @@ pub struct CredentialsConfig {
     pub password: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct AcmeTomlConfig {
+    pub enabled: Option<bool>,
+    pub domains: Option<Vec<String>>,
+    pub contact: Option<String>,
+    pub cache_dir: Option<String>,
+    pub staging: Option<bool>,
+    pub http_port: Option<u16>,
+    pub https_port: Option<u16>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AcmeConfig {
+    pub domains: Vec<String>,
+    pub contact: Option<String>,
+    pub cache_dir: String,
+    pub staging: bool,
+    pub http_port: u16,
+    pub https_port: u16,
+}
+
 /// Resolved application configuration (after merging TOML + CLI)
 #[derive(Debug)]
 pub struct AppConfig {
@@ -35,6 +57,7 @@ pub struct AppConfig {
     pub default_username: Option<String>,
     pub default_password: Option<String>,
     pub command: Option<Commands>,
+    pub acme: Option<AcmeConfig>,
 }
 
 #[derive(Parser, Debug)]
@@ -91,12 +114,34 @@ impl AppConfig {
                 None => (None, None),
             };
 
+        let acme = toml_config.acme.and_then(|a| {
+            if !a.enabled.unwrap_or(false) {
+                return None;
+            }
+            let domains = a.domains.unwrap_or_default();
+            if domains.is_empty() {
+                warn!("acme.enabled = true but no domains configured; disabling ACME");
+                return None;
+            }
+            Some(AcmeConfig {
+                domains,
+                contact: a.contact,
+                cache_dir: a
+                    .cache_dir
+                    .unwrap_or_else(|| "/var/lib/kernelci-status/acme".to_string()),
+                staging: a.staging.unwrap_or(true),
+                http_port: a.http_port.unwrap_or(80),
+                https_port: a.https_port.unwrap_or(443),
+            })
+        });
+
         AppConfig {
             port,
             db_path,
             default_username,
             default_password,
             command: cli.command,
+            acme,
         }
     }
 }

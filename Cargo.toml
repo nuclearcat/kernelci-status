@@ -1,6 +1,6 @@
 [package]
 name = "kernelci-status"
-version = "0.2.7"
+version = "0.3.0"
 edition = "2024"
 
 [dependencies]
@@ -30,6 +30,11 @@ tokio-rustls = "0.26"
 rustls = { version = "0.23", features = ["ring"] }
 webpki-roots = "1.0"
 rustls-pki-types = "1"
+
+# ACME (Let's Encrypt) - uses `ring` to match the rest of the codebase's rustls provider
+rustls-acme = { version = "0.15", default-features = false, features = ["ring", "tls12", "webpki-roots", "tokio", "axum"] }
+axum-server = "0.8"
+futures-util = "0.3"
 
 # Prometheus parsing
 prometheus-parse = "0.2"

@@ -14,3 +14,17 @@ path = "/var/lib/kernelci-status/status.db"
 # Remove or comment out this section after initial setup.
 username = "admin"
 password = "changeme"
+
+# Optional: ACME (Let's Encrypt) TLS with automatic renewal.
+# When enabled, the plain [server].port above is ignored and the daemon
+# listens on http_port (redirects everything to HTTPS) and https_port.
+# Certificates are cached on disk and auto-renewed ~30 days before expiry.
+# [acme]
+# enabled = true
+# domains = ["status.kernelci.org"]
+# contact = "bot@kernelci.org"           # recommended: LE sends renewal reminders here
+# cache_dir = "/var/lib/kernelci-status/acme"
+# staging = true                         # default: use Let's Encrypt staging (untrusted certs
+#                                        # but no rate limits). Flip to false for production.
+# http_port = 80
+# https_port = 443
