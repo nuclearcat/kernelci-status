@@ -18,6 +18,8 @@ struct WindowView {
     name: String,
     start_time: String,
     end_time: String,
+    is_active: bool,
+    is_past: bool,
     endpoint_names: Vec<String>,
     is_deploy: bool,
     changelog: String,
@@ -51,6 +53,10 @@ pub async fn maintenance_page(
         set.into_iter().collect()
     };
 
+    let now_full = chrono::Utc::now()
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+
     // Build view models with resolved endpoint names and truncated times
     let windows: Vec<WindowView> = windows
         .into_iter()
@@ -64,6 +70,9 @@ pub async fn maintenance_page(
             WindowView {
                 id: w.id,
                 name: w.name,
+                is_active: w.start_time.as_str() <= now_full.as_str()
+                    && w.end_time.as_str() > now_full.as_str(),
+                is_past: w.end_time.as_str() <= now_full.as_str(),
                 start_time: truncate_seconds(&w.start_time),
                 end_time: truncate_seconds(&w.end_time),
                 endpoint_names: names.into_iter().collect(),
@@ -73,7 +82,7 @@ pub async fn maintenance_page(
         })
         .collect();
 
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M").to_string();
+    let now = truncate_seconds(&now_full);
 
     Ok(Html(
         MaintenanceTemplate {
@@ -215,6 +224,26 @@ pub async fn delete_maintenance(
     let db = state.db.clone();
     db.call(move |conn| crate::db::maintenance::delete(conn, id))
         .await?;
+    Ok(Redirect::to("/admin/maintenance"))
+}
+
+pub async fn close_maintenance(
+    State(state): State<AppState>,
+    _user: AuthUser,
+    Path(id): Path<i64>,
+) -> Result<impl IntoResponse, AppError> {
+    let ended_at = chrono::Utc::now()
+        .format("%Y-%m-%d %H:%M:%S")
+        .to_string();
+    let db = state.db.clone();
+    let closed = db
+        .call(move |conn| crate::db::maintenance::close_early(conn, id, &ended_at))
+        .await?;
+    if !closed {
+        return Err(AppError::BadRequest(
+            "Maintenance window is not currently active".to_string(),
+        ));
+    }
     Ok(Redirect::to("/admin/maintenance"))
 }
 

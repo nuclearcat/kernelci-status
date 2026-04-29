@@ -11,10 +11,13 @@ pub mod reports;
 pub mod status;
 pub mod users;
 
+use axum::extract::DefaultBodyLimit;
 use axum::http::{header, HeaderValue};
 use axum::response::IntoResponse;
 use axum::Router;
 use tower_http::set_header::SetResponseHeaderLayer;
+
+const RESTORE_BODY_LIMIT: usize = 128 * 1024 * 1024;
 
 use crate::state::AppState;
 
@@ -99,6 +102,10 @@ pub fn router(state: AppState) -> Router {
             axum::routing::post(maintenance::delete_maintenance),
         )
         .route(
+            "/admin/maintenance/close/{id}",
+            axum::routing::post(maintenance::close_maintenance),
+        )
+        .route(
             "/admin/incidents",
             axum::routing::get(incidents::incidents_page),
         )
@@ -149,6 +156,15 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/admin/configuration/test-email",
             axum::routing::post(configuration::test_email),
+        )
+        .route(
+            "/admin/configuration/backup",
+            axum::routing::get(configuration::download_backup),
+        )
+        .route(
+            "/admin/configuration/restore",
+            axum::routing::post(configuration::restore_backup)
+                .layer(DefaultBodyLimit::max(RESTORE_BODY_LIMIT)),
         )
         .route("/admin/users", axum::routing::get(users::users_page))
         .route("/admin/users/add", axum::routing::post(users::add_user))

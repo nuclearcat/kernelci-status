@@ -1,5 +1,6 @@
 use askama::Template;
-use axum::extract::State;
+use axum::extract::{Multipart, State};
+use axum::http::header;
 use axum::response::{Html, IntoResponse};
 use axum::Form;
 use serde::Deserialize;
@@ -359,6 +360,178 @@ fn is_valid_email(email: &str) -> bool {
         return false;
     }
     !email.contains(' ')
+}
+
+pub async fn download_backup(
+    State(state): State<AppState>,
+    _user: AuthUser,
+) -> Result<impl IntoResponse, AppError> {
+    let ts = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
+    let tmp_path = std::env::temp_dir().join(format!(
+        "kernelci-status-backup-{}-{}.db",
+        ts,
+        std::process::id()
+    ));
+    let tmp_path_sql = tmp_path.to_string_lossy().to_string();
+
+    let db = state.db.clone();
+    db.call(move |conn| -> rusqlite::Result<()> {
+        // Use a literal path — VACUUM INTO does not accept parameter binding.
+        // We escape single quotes to keep the statement safe.
+        let escaped = tmp_path_sql.replace('\'', "''");
+        conn.execute_batch(&format!("VACUUM INTO '{escaped}'"))?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("Failed to create backup: {e}")))?;
+
+    let bytes = tokio::fs::read(&tmp_path)
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to read backup file: {e}")))?;
+    let _ = tokio::fs::remove_file(&tmp_path).await;
+
+    let filename = format!("kernelci-status-{ts}.db");
+    let headers = [
+        (header::CONTENT_TYPE, "application/vnd.sqlite3".to_string()),
+        (
+            header::CONTENT_DISPOSITION,
+            format!("attachment; filename=\"{filename}\""),
+        ),
+    ];
+    Ok((headers, bytes))
+}
+
+pub async fn restore_backup(
+    State(state): State<AppState>,
+    user: AuthUser,
+    mut multipart: Multipart,
+) -> Result<impl IntoResponse, AppError> {
+    let mut uploaded: Option<Vec<u8>> = None;
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("Invalid upload: {e}")))?
+    {
+        if field.name() == Some("backup") {
+            let bytes = field
+                .bytes()
+                .await
+                .map_err(|e| AppError::BadRequest(format!("Failed to read upload: {e}")))?;
+            uploaded = Some(bytes.to_vec());
+            break;
+        }
+    }
+
+    let bytes = match uploaded {
+        Some(b) if !b.is_empty() => b,
+        _ => return render_with_error(&state, &user.username, "No backup file uploaded.").await,
+    };
+
+    // SQLite files start with the magic header "SQLite format 3\0"
+    if bytes.len() < 16 || &bytes[..16] != b"SQLite format 3\0" {
+        return render_with_error(
+            &state,
+            &user.username,
+            "Uploaded file is not a valid SQLite database.",
+        )
+        .await;
+    }
+
+    let tmp_path = std::env::temp_dir().join(format!(
+        "kernelci-status-restore-{}-{}.db",
+        chrono::Utc::now().timestamp_millis(),
+        std::process::id()
+    ));
+    tokio::fs::write(&tmp_path, &bytes)
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to write temp file: {e}")))?;
+
+    // Validate schema by opening read-only and checking for expected core tables.
+    let tmp_path_val = tmp_path.clone();
+    let validation = tokio::task::spawn_blocking(move || -> Result<(), String> {
+        let conn = rusqlite::Connection::open_with_flags(
+            &tmp_path_val,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .map_err(|e| format!("Cannot open uploaded file as SQLite: {e}"))?;
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master \
+                 WHERE type='table' AND name IN ('endpoints','config','users')",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(|e| format!("Cannot inspect uploaded database: {e}"))?;
+        if count < 3 {
+            return Err(
+                "Uploaded file is not a kernelci-status backup (missing required tables)."
+                    .to_string(),
+            );
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| AppError::Internal(format!("Validation task failed: {e}")))?;
+
+    if let Err(msg) = validation {
+        let _ = tokio::fs::remove_file(&tmp_path).await;
+        return render_with_error(&state, &user.username, &msg).await;
+    }
+
+    // Restore into the live connection. This atomically copies every page from
+    // the source file into the destination database, so all other handlers
+    // sharing this connection immediately see the restored state.
+    let tmp_path_restore = tmp_path.clone();
+    let restore_result = state
+        .db
+        .call(move |conn| -> rusqlite::Result<()> {
+            let progress: Option<fn(rusqlite::backup::Progress)> = None;
+            conn.restore("main", &tmp_path_restore, progress)?;
+            Ok(())
+        })
+        .await;
+
+    let _ = tokio::fs::remove_file(&tmp_path).await;
+
+    if let Err(e) = restore_result {
+        return Err(AppError::Internal(format!("Failed to restore backup: {e}")));
+    }
+
+    // Refresh the in-memory config cache from the newly restored database.
+    let new_config = load_config_from_db(&state).await?;
+    *state.config_cache.write().await = new_config;
+
+    let config = load_config(&state).await?;
+    Ok(Html(
+        ConfigurationTemplate {
+            username: user.username,
+            c: AppConfigView::from_map(&config),
+            error: String::new(),
+            success: "Backup restored successfully.".to_string(),
+        }
+        .render()
+        .unwrap_or_default(),
+    )
+    .into_response())
+}
+
+async fn render_with_error(
+    state: &AppState,
+    username: &str,
+    msg: &str,
+) -> Result<axum::response::Response, AppError> {
+    let config = load_config(state).await?;
+    Ok(Html(
+        ConfigurationTemplate {
+            username: username.to_string(),
+            c: AppConfigView::from_map(&config),
+            error: msg.to_string(),
+            success: String::new(),
+        }
+        .render()
+        .unwrap_or_default(),
+    )
+    .into_response())
 }
 
 async fn load_config(state: &AppState) -> Result<HashMap<String, String>, AppError> {

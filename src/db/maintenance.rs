@@ -87,6 +87,17 @@ pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<bool> {
     Ok(rows > 0)
 }
 
+/// End an active maintenance window immediately.
+pub fn close_early(conn: &Connection, id: i64, ended_at: &str) -> rusqlite::Result<bool> {
+    let rows = conn.execute(
+        "UPDATE maintenance_windows
+         SET end_time = ?1
+         WHERE id = ?2 AND start_time <= ?1 AND end_time > ?1",
+        params![ended_at, id],
+    )?;
+    Ok(rows > 0)
+}
+
 /// Get all endpoint IDs that are currently in an active maintenance window.
 pub fn get_active_endpoint_ids(conn: &Connection, now: &str) -> rusqlite::Result<HashSet<i64>> {
     let mut stmt = conn.prepare(
@@ -270,4 +281,83 @@ fn set_endpoint_ids(conn: &Connection, window_id: i64, ids: &[i64]) -> rusqlite:
         )?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use rusqlite::Connection;
+
+    use super::{close_early, insert, NewMaintenanceWindow};
+
+    fn setup_conn() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "
+            CREATE TABLE maintenance_windows (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                start_time DATETIME NOT NULL,
+                end_time DATETIME NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+                reminder_sent BOOLEAN NOT NULL DEFAULT 0,
+                is_deploy BOOLEAN NOT NULL DEFAULT 0,
+                changelog TEXT
+            );
+            CREATE TABLE maintenance_window_endpoints (
+                window_id INTEGER NOT NULL,
+                endpoint_id INTEGER NOT NULL,
+                PRIMARY KEY (window_id, endpoint_id)
+            );
+            ",
+        )
+        .unwrap();
+        conn
+    }
+
+    fn window(start_time: &str, end_time: &str) -> NewMaintenanceWindow {
+        NewMaintenanceWindow {
+            name: "test maintenance".to_string(),
+            start_time: start_time.to_string(),
+            end_time: end_time.to_string(),
+            endpoint_ids: Vec::new(),
+            is_deploy: false,
+            changelog: None,
+        }
+    }
+
+    #[test]
+    fn close_early_only_updates_active_window() {
+        let conn = setup_conn();
+        let active_id = insert(
+            &conn,
+            &window("2026-04-29 10:00:00", "2026-04-29 12:00:00"),
+        )
+        .unwrap();
+        let future_id = insert(
+            &conn,
+            &window("2026-04-29 13:00:00", "2026-04-29 14:00:00"),
+        )
+        .unwrap();
+
+        assert!(close_early(&conn, active_id, "2026-04-29 11:00:00").unwrap());
+        assert!(!close_early(&conn, future_id, "2026-04-29 11:00:00").unwrap());
+
+        let active_end: String = conn
+            .query_row(
+                "SELECT end_time FROM maintenance_windows WHERE id = ?1",
+                [active_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let future_end: String = conn
+            .query_row(
+                "SELECT end_time FROM maintenance_windows WHERE id = ?1",
+                [future_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        assert_eq!(active_end, "2026-04-29 11:00:00");
+        assert_eq!(future_end, "2026-04-29 14:00:00");
+    }
 }

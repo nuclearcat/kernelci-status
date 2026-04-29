@@ -1,6 +1,6 @@
 [package]
 name = "kernelci-status"
-version = "0.3.1"
+version = "0.3.3"
 edition = "2024"
 
 [dependencies]
@@ -8,11 +8,11 @@ edition = "2024"
 tokio = { version = "1", features = ["full"] }
 
 # Database
-rusqlite = { version = "0.37", features = ["bundled"] }
+rusqlite = { version = "0.37", features = ["bundled", "backup"] }
 tokio-rusqlite = "0.7"
 
 # Web framework
-axum = "0.8"
+axum = { version = "0.8", features = ["multipart"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["set-header"] }
 

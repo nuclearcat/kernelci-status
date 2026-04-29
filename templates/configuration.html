@@ -106,4 +106,23 @@
         <button type="submit" class="outline">Send Test Email</button>
     </form>
 </article>
+
+<article>
+    <header><h3>Backup &amp; Restore</h3></header>
+    <p>Download a consistent snapshot of the SQLite database, or restore the entire database from a previously downloaded snapshot.</p>
+    <div class="grid">
+        <form method="get" action="/admin/configuration/backup">
+            <button type="submit" class="outline">Download Backup</button>
+            <small>Downloads the full database as a SQLite file.</small>
+        </form>
+        <form method="post" action="/admin/configuration/restore" enctype="multipart/form-data" onsubmit="return confirm('This will overwrite the entire database with the uploaded backup. Continue?');">
+            <label>
+                Upload SQLite Backup
+                <input type="file" name="backup" accept=".db,.sqlite,.sqlite3,application/vnd.sqlite3,application/x-sqlite3" required>
+            </label>
+            <button type="submit" class="outline contrast">Restore Backup</button>
+            <small>Replaces all current data. Cannot be undone.</small>
+        </form>
+    </div>
+</article>
 {% endblock %}

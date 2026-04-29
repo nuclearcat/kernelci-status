@@ -113,10 +113,10 @@
         {% for w in windows %}
         <tr>
             <td>
-                {% if w.end_time.as_str() < now.as_str() %}
-                <span class="badge badge-nodata">Past</span>
-                {% else if w.start_time.as_str() <= now.as_str() %}
+                {% if w.is_active %}
                 <span class="badge badge-maintenance">Active</span>
+                {% else if w.is_past %}
+                <span class="badge badge-nodata">Past</span>
                 {% else %}
                 <span class="badge badge-ok">Scheduled</span>
                 {% endif %}
@@ -145,6 +145,11 @@
             </td>
             <td>
                 <div class="action-group">
+                    {% if w.is_active %}
+                    <form method="post" action="/admin/maintenance/close/{{ w.id }}" style="display:inline">
+                        <button type="submit" class="outline btn-sm" onclick="return confirm('Close this maintenance window now?')">Close now</button>
+                    </form>
+                    {% endif %}
                     <button type="button" class="outline btn-sm" onclick="let r=this.closest('tr').nextElementSibling; r.hidden=!r.hidden">Edit</button>
                     <form method="post" action="/admin/maintenance/delete/{{ w.id }}" style="display:inline">
                         <button type="submit" class="outline secondary btn-sm" onclick="return confirm('Delete this maintenance window?')">Delete</button>
