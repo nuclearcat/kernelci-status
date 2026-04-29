@@ -5,3 +5,6 @@ status.db
 status.db-shm
 status.db-wal
 *.deb
+.claude/
+.codex
+SYSADMIN_REPORT.md

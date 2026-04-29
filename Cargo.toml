@@ -2,6 +2,12 @@
 name = "kernelci-status"
 version = "0.3.3"
 edition = "2024"
+rust-version = "1.85"
+description = "Status page and infrastructure monitoring daemon for KernelCI services"
+license = "LGPL-2.1-only"
+readme = "README.md"
+keywords = ["kernelci", "monitoring", "status-page"]
+categories = ["web-programming", "command-line-utilities"]
 
 [dependencies]
 # Async runtime
