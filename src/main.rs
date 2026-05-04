@@ -31,13 +31,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let cli = Cli::parse();
-    let cfg = AppConfig::load(cli);
+    let cfg = AppConfig::load(cli).await;
 
     // Ensure parent directory exists for the database
     if let Some(parent) = std::path::Path::new(&cfg.db_path).parent() {
-        if !parent.as_os_str().is_empty() && !parent.exists() {
-            std::fs::create_dir_all(parent)?;
-            info!("Created database directory: {}", parent.display());
+        if !parent.as_os_str().is_empty() {
+            match tokio::fs::metadata(parent).await {
+                Ok(_) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    tokio::fs::create_dir_all(parent).await?;
+                    info!("Created database directory: {}", parent.display());
+                }
+                Err(e) => return Err(e.into()),
+            }
         }
     }
 
@@ -175,7 +181,7 @@ async fn serve_with_acme(
     // key and issued certs here, which is what makes renewal automatic across
     // restarts (it will reuse a cert that still has >30d of validity, and
     // renew in-place when it gets close to expiry).
-    std::fs::create_dir_all(&cfg.cache_dir)?;
+    tokio::fs::create_dir_all(&cfg.cache_dir).await?;
 
     info!(
         "ACME enabled: domains={:?}, staging={}, cache_dir={}",
