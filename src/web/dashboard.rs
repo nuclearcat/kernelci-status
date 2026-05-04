@@ -44,17 +44,17 @@ pub async fn dashboard(
     let endpoints: Vec<EndpointWithState> = db
         .call(|conn| {
             let eps = crate::db::endpoints::list_all(conn)?;
+            let latest_by_endpoint = crate::db::history::get_latest_by_endpoint(conn)?;
             let mut result = Vec::new();
             for ep in eps {
-                let latest = crate::db::history::get_latest_for_endpoint(conn, ep.id)?;
+                let latest = latest_by_endpoint.get(&ep.id);
                 result.push(EndpointWithState {
                     state: latest
-                        .as_ref()
                         .map(|h| h.state.clone())
                         .unwrap_or_else(|| "NO_DATA".to_string()),
-                    value: latest.as_ref().and_then(|h| h.value.clone()),
-                    message: latest.as_ref().and_then(|h| h.message.clone()),
-                    last_check: latest.map(|h| h.timestamp),
+                    value: latest.and_then(|h| h.value.clone()),
+                    message: latest.and_then(|h| h.message.clone()),
+                    last_check: latest.map(|h| h.timestamp.clone()),
                     endpoint: ep,
                 });
             }

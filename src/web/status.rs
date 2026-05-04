@@ -159,6 +159,8 @@ pub async fn status_data(
 
             let start = now - chrono::Duration::hours(hours);
             let start_str = start.format("%Y-%m-%d %H:%M:%S").to_string();
+            let history_by_endpoint = crate::db::history::get_since_by_endpoint(conn, &start_str)?;
+            let latest_by_endpoint = crate::db::history::get_latest_by_endpoint(conn)?;
 
             let mut by_name: BTreeMap<String, Vec<EndpointData>> = BTreeMap::new();
 
@@ -166,11 +168,13 @@ pub async fn status_data(
                 if !ep.enabled {
                     continue;
                 }
-                let entries = crate::db::history::get_since(conn, ep.id, &start_str)?;
-                let latest = crate::db::history::get_latest_for_endpoint(conn, ep.id)?;
+                let entries = history_by_endpoint
+                    .get(&ep.id)
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]);
+                let latest = latest_by_endpoint.get(&ep.id);
 
                 let current_state = latest
-                    .as_ref()
                     .map(|h| h.state.clone())
                     .unwrap_or_else(|| "NO_DATA".to_string());
 
