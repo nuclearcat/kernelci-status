@@ -1,7 +1,6 @@
 use rusqlite::{Connection, OptionalExtension, params};
-use serde::Serialize;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct User {
     pub id: i64,
     pub username: String,
