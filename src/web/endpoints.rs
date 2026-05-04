@@ -1,7 +1,7 @@
 use askama::Template;
+use axum::Form;
 use axum::extract::{Path, State};
 use axum::response::{Html, IntoResponse, Redirect};
-use axum::Form;
 use serde::Deserialize;
 
 use crate::auth::AuthUser;
@@ -31,9 +31,7 @@ pub async fn endpoints_page(
     user: AuthUser,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
-    let endpoints = db
-        .call(|conn| crate::db::endpoints::list_all(conn))
-        .await?;
+    let endpoints = db.call(|conn| crate::db::endpoints::list_all(conn)).await?;
 
     Ok(Html(
         EndpointsTemplate {

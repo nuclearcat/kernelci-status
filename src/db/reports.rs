@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 
 /// Uptime statistics for a single service (grouped by endpoint name).
 #[derive(Debug, Clone)]
@@ -215,9 +215,8 @@ pub fn list_maintenance_in_range(
 
     let mut results = Vec::new();
     for (id, name, start_time, end_time) in windows {
-        let mut ep_stmt = conn.prepare(
-            "SELECT endpoint_id FROM maintenance_window_endpoints WHERE window_id = ?1",
-        )?;
+        let mut ep_stmt = conn
+            .prepare("SELECT endpoint_id FROM maintenance_window_endpoints WHERE window_id = ?1")?;
         let ep_ids: Vec<i64> = ep_stmt
             .query_map(params![id], |row| row.get("endpoint_id"))?
             .collect::<Result<Vec<_>, _>>()?;
@@ -225,10 +224,13 @@ pub fn list_maintenance_in_range(
         let ep_names: Vec<String> = ep_ids
             .iter()
             .filter_map(|eid| {
-                endpoints.iter().find(|e| e.id == *eid).map(|e| match &e.subname {
-                    Some(sub) => format!("{} ({})", e.name, sub),
-                    None => e.name.clone(),
-                })
+                endpoints
+                    .iter()
+                    .find(|e| e.id == *eid)
+                    .map(|e| match &e.subname {
+                        Some(sub) => format!("{} ({})", e.name, sub),
+                        None => e.name.clone(),
+                    })
             })
             .collect();
 

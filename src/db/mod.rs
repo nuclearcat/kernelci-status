@@ -13,9 +13,9 @@ use tokio_rusqlite::Connection;
 use crate::error::AppError;
 
 pub async fn open_and_migrate(path: &str) -> Result<Connection, AppError> {
-    let conn = Connection::open(path).await.map_err(|_| {
-        AppError::Internal("Failed to open database".to_string())
-    })?;
+    let conn = Connection::open(path)
+        .await
+        .map_err(|_| AppError::Internal("Failed to open database".to_string()))?;
 
     conn.call(|conn| {
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;

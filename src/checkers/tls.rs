@@ -38,8 +38,8 @@ async fn do_check(endpoint: &Endpoint) -> Result<CheckResult, String> {
         .with_no_client_auth();
 
     let connector = TlsConnector::from(Arc::new(tls_config));
-    let server_name = ServerName::try_from(host.to_string())
-        .map_err(|e| format!("Invalid server name: {e}"))?;
+    let server_name =
+        ServerName::try_from(host.to_string()).map_err(|e| format!("Invalid server name: {e}"))?;
 
     let stream = tokio::time::timeout(CONNECT_TIMEOUT, TcpStream::connect(&addr))
         .await
@@ -52,9 +52,7 @@ async fn do_check(endpoint: &Endpoint) -> Result<CheckResult, String> {
         .map_err(|e| format!("TLS handshake failed: {e}"))?;
 
     let (_io, session) = tls_stream.into_inner();
-    let certs = session
-        .peer_certificates()
-        .ok_or("No peer certificates")?;
+    let certs = session.peer_certificates().ok_or("No peer certificates")?;
 
     let leaf_cert = certs.first().ok_or("No leaf certificate")?;
 

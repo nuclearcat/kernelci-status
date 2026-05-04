@@ -4,11 +4,7 @@ use crate::checkers::EndpointState;
 /// Conditions: <N, >N, ==N, !=N, diff(12h)>N, diff(12h)<N
 /// Returns the resulting state (Warning or Critical based on context).
 /// `value` is the current measured value, `past_value` is for diff() conditions.
-pub fn evaluate(
-    condition: &str,
-    value: Option<&str>,
-    past_value: Option<&str>,
-) -> EndpointState {
+pub fn evaluate(condition: &str, value: Option<&str>, past_value: Option<&str>) -> EndpointState {
     let condition = condition.trim();
     if condition.is_empty() {
         return EndpointState::Ok;
@@ -81,7 +77,12 @@ pub fn evaluate(
     EndpointState::Ok
 }
 
-fn evaluate_diff(rest: &str, value: Option<&str>, past_value: Option<&str>, absolute: bool) -> EndpointState {
+fn evaluate_diff(
+    rest: &str,
+    value: Option<&str>,
+    past_value: Option<&str>,
+    absolute: bool,
+) -> EndpointState {
     // Parse: 12h)>N or 12h)<N
     let close_paren = match rest.find(')') {
         Some(i) => i,
@@ -262,7 +263,10 @@ mod tests {
     #[test]
     fn test_no_data() {
         assert_eq!(evaluate(">90", None, None), EndpointState::NoData);
-        assert_eq!(evaluate("diff(12h)>100", Some("500"), None), EndpointState::NoData);
+        assert_eq!(
+            evaluate("diff(12h)>100", Some("500"), None),
+            EndpointState::NoData
+        );
     }
 
     #[test]

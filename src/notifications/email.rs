@@ -1,5 +1,5 @@
-use lettre::message::header::ContentType;
 use lettre::message::Mailbox;
+use lettre::message::header::ContentType;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 use std::collections::HashMap;
@@ -57,10 +57,7 @@ fn from_mailbox(config: &HashMap<String, String>) -> Result<Mailbox, String> {
         .get("email_from")
         .filter(|e| !e.is_empty())
         .ok_or("From email address is not configured")?;
-    let from_name = config
-        .get("email_from_name")
-        .cloned()
-        .unwrap_or_default();
+    let from_name = config.get("email_from_name").cloned().unwrap_or_default();
 
     if from_name.is_empty() {
         from_email
@@ -246,10 +243,7 @@ pub async fn send_incident_email(
                 )
             })
             .collect();
-        format!(
-            r#"<div style="margin:20px 0;">{}</div>"#,
-            btns.join("\n")
-        )
+        format!(r#"<div style="margin:20px 0;">{}</div>"#, btns.join("\n"))
     };
 
     let extra_html = if extra_message.is_empty() {

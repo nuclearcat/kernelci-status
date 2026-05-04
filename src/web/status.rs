@@ -26,9 +26,21 @@ struct RangeConfig {
 
 fn parse_range(range: Option<&str>) -> RangeConfig {
     match range {
-        Some("7d") => RangeConfig { hours: 168, slot_minutes: 105, label: "7d" },
-        Some("30d") => RangeConfig { hours: 720, slot_minutes: 450, label: "30d" },
-        _ => RangeConfig { hours: 24, slot_minutes: 15, label: "24h" },
+        Some("7d") => RangeConfig {
+            hours: 168,
+            slot_minutes: 105,
+            label: "7d",
+        },
+        Some("30d") => RangeConfig {
+            hours: 720,
+            slot_minutes: 450,
+            label: "30d",
+        },
+        _ => RangeConfig {
+            hours: 24,
+            slot_minutes: 15,
+            label: "24h",
+        },
     }
 }
 
@@ -86,7 +98,7 @@ pub struct IncidentBanner {
 
 /// A past event (resolved incident, outage, or deploy) for the history section.
 pub struct HistoryEvent {
-    pub event_type: String,  // "incident", "outage", or "deploy"
+    pub event_type: String, // "incident", "outage", or "deploy"
     pub title: String,
     pub severity: String,
     pub severity_css: String,
@@ -116,7 +128,11 @@ struct StatusDataTemplate {
 pub async fn status_page() -> impl IntoResponse {
     Html(
         StatusShellTemplate {
-            year: chrono::Utc::now().format("%Y").to_string().parse().unwrap_or(2025),
+            year: chrono::Utc::now()
+                .format("%Y")
+                .to_string()
+                .parse()
+                .unwrap_or(2025),
         }
         .render()
         .unwrap_or_default(),
@@ -145,7 +161,13 @@ pub async fn status_data(
     let active_range = range_cfg.label.to_string();
 
     let db = state.db.clone();
-    let (groups, active_maintenance, upcoming_maintenance, active_incidents, past_events): (Vec<ServiceGroup>, Vec<MaintenanceBanner>, Vec<MaintenanceBanner>, Vec<IncidentBanner>, Vec<HistoryEvent>) = db
+    let (groups, active_maintenance, upcoming_maintenance, active_incidents, past_events): (
+        Vec<ServiceGroup>,
+        Vec<MaintenanceBanner>,
+        Vec<MaintenanceBanner>,
+        Vec<IncidentBanner>,
+        Vec<HistoryEvent>,
+    ) = db
         .call(move |conn| {
             let endpoints = crate::db::endpoints::list_all(conn)?;
 
@@ -153,9 +175,12 @@ pub async fn status_data(
             let slot_secs = slot_minutes * 60;
             let ts = raw_now.timestamp();
             let remainder = ts % slot_secs;
-            let aligned_ts = if remainder == 0 { ts } else { ts + slot_secs - remainder };
-            let now = chrono::DateTime::from_timestamp(aligned_ts, 0)
-                .unwrap_or(raw_now);
+            let aligned_ts = if remainder == 0 {
+                ts
+            } else {
+                ts + slot_secs - remainder
+            };
+            let now = chrono::DateTime::from_timestamp(aligned_ts, 0).unwrap_or(raw_now);
 
             let start = now - chrono::Duration::hours(hours);
             let start_str = start.format("%Y-%m-%d %H:%M:%S").to_string();
@@ -203,7 +228,9 @@ pub async fn status_data(
                     .iter()
                     .filter(|e| {
                         let base = base_state(&e.state);
-                        !e.state.ends_with("_MAINTENANCE") && e.state != "MAINTENANCE" && base != "NO_DATA"
+                        !e.state.ends_with("_MAINTENANCE")
+                            && e.state != "MAINTENANCE"
+                            && base != "NO_DATA"
                     })
                     .collect();
                 let sla_total = non_maint_entries.len();
@@ -247,7 +274,11 @@ pub async fn status_data(
                         }
                     })
                     .fold(f64::MAX, f64::min);
-                let uptime_pct = if uptime_pct == f64::MAX { 100.0 } else { uptime_pct };
+                let uptime_pct = if uptime_pct == f64::MAX {
+                    100.0
+                } else {
+                    uptime_pct
+                };
 
                 // SLA uptime
                 let sla_uptime_pct = eps
@@ -260,7 +291,11 @@ pub async fn status_data(
                         }
                     })
                     .fold(f64::MAX, f64::min);
-                let sla_uptime_pct = if sla_uptime_pct == f64::MAX { 100.0 } else { sla_uptime_pct };
+                let sla_uptime_pct = if sla_uptime_pct == f64::MAX {
+                    100.0
+                } else {
+                    sla_uptime_pct
+                };
 
                 // Group current state = worst across checks (using base state for ranking)
                 let group_state = eps
@@ -436,12 +471,13 @@ pub async fn status_data(
                     .endpoint_ids
                     .iter()
                     .filter_map(|eid| {
-                        endpoints.iter().find(|ep| ep.id == *eid).map(|ep| {
-                            match &ep.subname {
+                        endpoints
+                            .iter()
+                            .find(|ep| ep.id == *eid)
+                            .map(|ep| match &ep.subname {
                                 Some(sub) => format!("{} ({})", ep.name, sub),
                                 None => ep.name.clone(),
-                            }
-                        })
+                            })
                     })
                     .collect();
                 let ep_display = if ep_names.is_empty() {
@@ -467,7 +503,13 @@ pub async fn status_data(
             // Sort by resolved_at descending (most recent first)
             past_events.sort_by(|a, b| b.resolved_at.cmp(&a.resolved_at));
 
-            Ok((result, active_banners, upcoming_banners, incident_banners, past_events))
+            Ok((
+                result,
+                active_banners,
+                upcoming_banners,
+                incident_banners,
+                past_events,
+            ))
         })
         .await?;
 
@@ -479,16 +521,30 @@ pub async fn status_data(
         let base = base_state(&g.current_state);
         base == "WARNING"
     });
-    let has_maintenance = groups.iter().any(|g| g.current_state.contains("MAINTENANCE"));
+    let has_maintenance = groups
+        .iter()
+        .any(|g| g.current_state.contains("MAINTENANCE"));
 
     let (overall_label, overall_css) = if has_critical {
-        ("Some systems are experiencing issues".to_string(), "overall-critical".to_string())
+        (
+            "Some systems are experiencing issues".to_string(),
+            "overall-critical".to_string(),
+        )
     } else if has_warning {
-        ("Some systems have warnings".to_string(), "overall-warning".to_string())
+        (
+            "Some systems have warnings".to_string(),
+            "overall-warning".to_string(),
+        )
     } else if has_maintenance {
-        ("Some systems under planned maintenance".to_string(), "overall-maintenance".to_string())
+        (
+            "Some systems under planned maintenance".to_string(),
+            "overall-maintenance".to_string(),
+        )
     } else {
-        ("All systems operational".to_string(), "overall-ok".to_string())
+        (
+            "All systems operational".to_string(),
+            "overall-ok".to_string(),
+        )
     };
 
     Ok(Html(
@@ -587,7 +643,11 @@ fn merge_slot_state(a: &str, b: &str) -> String {
         _ => 0, // NO_DATA, MAINTENANCE
     };
 
-    let worse = if rank(base_b) > rank(base_a) { base_b } else { base_a };
+    let worse = if rank(base_b) > rank(base_a) {
+        base_b
+    } else {
+        base_a
+    };
 
     if either_maint && worse != "NO_DATA" {
         format!("{}_MAINTENANCE", worse)
@@ -611,11 +671,19 @@ fn compute_duration(start: &str, end: &str) -> String {
             } else if mins < 1440 {
                 let h = mins / 60;
                 let m = mins % 60;
-                if m == 0 { format!("{h}h") } else { format!("{h}h {m}m") }
+                if m == 0 {
+                    format!("{h}h")
+                } else {
+                    format!("{h}h {m}m")
+                }
             } else {
                 let d = mins / 1440;
                 let h = (mins % 1440) / 60;
-                if h == 0 { format!("{d}d") } else { format!("{d}d {h}h") }
+                if h == 0 {
+                    format!("{d}d")
+                } else {
+                    format!("{d}d {h}h")
+                }
             }
         }
         _ => "—".to_string(),

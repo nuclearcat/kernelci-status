@@ -22,13 +22,10 @@ async fn do_check(endpoint: &Endpoint) -> Result<CheckResult, String> {
     let url = &endpoint.endpoint;
     let host = url.strip_prefix("ssh://").unwrap_or(url);
 
-    let session = tokio::time::timeout(
-        CONNECT_TIMEOUT,
-        Session::connect(host, KnownHosts::Accept),
-    )
-    .await
-    .map_err(|_| "SSH connection timed out (10s)".to_string())?
-    .map_err(|e| format!("SSH connection failed: {e}"))?;
+    let session = tokio::time::timeout(CONNECT_TIMEOUT, Session::connect(host, KnownHosts::Accept))
+        .await
+        .map_err(|_| "SSH connection timed out (10s)".to_string())?
+        .map_err(|e| format!("SSH connection failed: {e}"))?;
 
     let output = tokio::time::timeout(
         CMD_TIMEOUT,

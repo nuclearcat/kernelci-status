@@ -62,18 +62,24 @@ pub async fn dashboard(
         })
         .await?;
 
-    let critical_count = endpoints.iter().filter(|e| {
-        e.state == "CRITICAL" || e.state == "CRITICAL_MAINTENANCE"
-    }).count();
-    let warning_count = endpoints.iter().filter(|e| {
-        e.state == "WARNING" || e.state == "WARNING_MAINTENANCE"
-    }).count();
-    let ok_count = endpoints.iter().filter(|e| {
-        e.state == "OK" || e.state == "OK_MAINTENANCE"
-    }).count();
-    let nodata_count = endpoints.iter().filter(|e| {
-        e.state == "NO_DATA" || e.state == "NO_DATA_MAINTENANCE" || e.state == "MAINTENANCE"
-    }).count();
+    let critical_count = endpoints
+        .iter()
+        .filter(|e| e.state == "CRITICAL" || e.state == "CRITICAL_MAINTENANCE")
+        .count();
+    let warning_count = endpoints
+        .iter()
+        .filter(|e| e.state == "WARNING" || e.state == "WARNING_MAINTENANCE")
+        .count();
+    let ok_count = endpoints
+        .iter()
+        .filter(|e| e.state == "OK" || e.state == "OK_MAINTENANCE")
+        .count();
+    let nodata_count = endpoints
+        .iter()
+        .filter(|e| {
+            e.state == "NO_DATA" || e.state == "NO_DATA_MAINTENANCE" || e.state == "MAINTENANCE"
+        })
+        .count();
 
     let is_htmx = headers.get("HX-Request").is_some();
     if is_htmx {

@@ -1,7 +1,7 @@
 use askama::Template;
+use axum::Form;
 use axum::extract::State;
 use axum::response::{Html, IntoResponse};
-use axum::Form;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -20,9 +20,8 @@ pub struct NotifConfig {
 
 impl NotifConfig {
     fn from_map(m: &HashMap<String, String>) -> Self {
-        let g = |k: &str, def: &str| -> String {
-            m.get(k).cloned().unwrap_or_else(|| def.to_string())
-        };
+        let g =
+            |k: &str, def: &str| -> String { m.get(k).cloned().unwrap_or_else(|| def.to_string()) };
         Self {
             discord_enabled: m.get("discord_enabled").is_some_and(|v| v == "true"),
             discord_webhook_url: g("discord_webhook_url", ""),
@@ -155,7 +154,10 @@ pub async fn save_notifications(
         };
 
         set_toggle("discord_enabled", &form.discord_enabled)?;
-        set("discord_webhook_url", form.discord_webhook_url.as_deref().unwrap_or(""))?;
+        set(
+            "discord_webhook_url",
+            form.discord_webhook_url.as_deref().unwrap_or(""),
+        )?;
         set_toggle("email_enabled", &form.email_enabled)?;
         set("email_to", &cleaned_emails)?;
         set_toggle("textfile_enabled", &form.textfile_enabled)?;

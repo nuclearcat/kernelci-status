@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde::Serialize;
 use std::collections::HashSet;
 
@@ -54,7 +54,7 @@ pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<MaintenanceWindow>> {
 }
 
 // TODO: Create validation, must not be inserted in past and overlapping with existing windows for same endpoints.
-// Probably don't allow to insert maintenance windows on short notice as well, maybe less than 1 hour before start time or something like that. 
+// Probably don't allow to insert maintenance windows on short notice as well, maybe less than 1 hour before start time or something like that.
 pub fn insert(conn: &Connection, mw: &NewMaintenanceWindow) -> rusqlite::Result<i64> {
     conn.execute(
         "INSERT INTO maintenance_windows (name, start_time, end_time, is_deploy, changelog) VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -78,7 +78,7 @@ pub fn update(conn: &Connection, id: i64, mw: &NewMaintenanceWindow) -> rusqlite
     Ok(rows > 0)
 }
 
-// TODO: We should not delete past maintenance windows for consistency of historical data. 
+// TODO: We should not delete past maintenance windows for consistency of historical data.
 // Instead we should add an "archived" flag and filter them out of active lists.
 // Maybe even don't allow deleting on short notice as well
 pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<bool> {
@@ -113,7 +113,11 @@ pub fn get_active_endpoint_ids(conn: &Connection, now: &str) -> rusqlite::Result
 }
 
 /// Get maintenance windows that start within the next `days` days (but haven't started yet).
-pub fn get_upcoming(conn: &Connection, now: &str, days: i64) -> rusqlite::Result<Vec<MaintenanceWindow>> {
+pub fn get_upcoming(
+    conn: &Connection,
+    now: &str,
+    days: i64,
+) -> rusqlite::Result<Vec<MaintenanceWindow>> {
     let future = chrono::NaiveDateTime::parse_from_str(now, "%Y-%m-%d %H:%M:%S")
         .unwrap_or_default()
         + chrono::Duration::days(days);
@@ -180,7 +184,10 @@ pub fn get_active(conn: &Connection, now: &str) -> rusqlite::Result<Vec<Maintena
 }
 
 /// Get maintenance windows starting within the next hour that haven't had a reminder sent.
-pub fn get_needing_reminder(conn: &Connection, now: &str) -> rusqlite::Result<Vec<MaintenanceWindow>> {
+pub fn get_needing_reminder(
+    conn: &Connection,
+    now: &str,
+) -> rusqlite::Result<Vec<MaintenanceWindow>> {
     let one_hour = chrono::NaiveDateTime::parse_from_str(now, "%Y-%m-%d %H:%M:%S")
         .unwrap_or_default()
         + chrono::Duration::hours(1);
@@ -216,9 +223,12 @@ pub fn get_needing_reminder(conn: &Connection, now: &str) -> rusqlite::Result<Ve
 }
 
 /// Get past deploy maintenance windows (ended within last N days).
-pub fn get_past_deploys(conn: &Connection, now: &str, days: i64) -> rusqlite::Result<Vec<MaintenanceWindow>> {
-    let past = chrono::NaiveDateTime::parse_from_str(now, "%Y-%m-%d %H:%M:%S")
-        .unwrap_or_default()
+pub fn get_past_deploys(
+    conn: &Connection,
+    now: &str,
+    days: i64,
+) -> rusqlite::Result<Vec<MaintenanceWindow>> {
+    let past = chrono::NaiveDateTime::parse_from_str(now, "%Y-%m-%d %H:%M:%S").unwrap_or_default()
         - chrono::Duration::days(days);
     let past_str = past.format("%Y-%m-%d %H:%M:%S").to_string();
 
@@ -260,9 +270,8 @@ pub fn mark_reminder_sent(conn: &Connection, id: i64) -> rusqlite::Result<()> {
 }
 
 fn get_endpoint_ids(conn: &Connection, window_id: i64) -> rusqlite::Result<Vec<i64>> {
-    let mut stmt = conn.prepare(
-        "SELECT endpoint_id FROM maintenance_window_endpoints WHERE window_id = ?1",
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT endpoint_id FROM maintenance_window_endpoints WHERE window_id = ?1")?;
     let ids = stmt
         .query_map(params![window_id], |row| row.get::<_, i64>(0))?
         .collect::<Result<Vec<_>, _>>()?;
@@ -287,7 +296,7 @@ fn set_endpoint_ids(conn: &Connection, window_id: i64, ids: &[i64]) -> rusqlite:
 mod tests {
     use rusqlite::Connection;
 
-    use super::{close_early, insert, NewMaintenanceWindow};
+    use super::{NewMaintenanceWindow, close_early, insert};
 
     fn setup_conn() -> Connection {
         let conn = Connection::open_in_memory().unwrap();
@@ -328,16 +337,10 @@ mod tests {
     #[test]
     fn close_early_only_updates_active_window() {
         let conn = setup_conn();
-        let active_id = insert(
-            &conn,
-            &window("2026-04-29 10:00:00", "2026-04-29 12:00:00"),
-        )
-        .unwrap();
-        let future_id = insert(
-            &conn,
-            &window("2026-04-29 13:00:00", "2026-04-29 14:00:00"),
-        )
-        .unwrap();
+        let active_id =
+            insert(&conn, &window("2026-04-29 10:00:00", "2026-04-29 12:00:00")).unwrap();
+        let future_id =
+            insert(&conn, &window("2026-04-29 13:00:00", "2026-04-29 14:00:00")).unwrap();
 
         assert!(close_early(&conn, active_id, "2026-04-29 11:00:00").unwrap());
         assert!(!close_early(&conn, future_id, "2026-04-29 11:00:00").unwrap());

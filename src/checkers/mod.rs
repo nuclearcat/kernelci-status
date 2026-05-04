@@ -28,8 +28,6 @@ impl fmt::Display for EndpointState {
     }
 }
 
-
-
 #[derive(Debug, Clone)]
 pub struct CheckResult {
     pub state: EndpointState,

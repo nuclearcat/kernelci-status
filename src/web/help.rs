@@ -10,5 +10,11 @@ struct HelpTemplate {
 }
 
 pub async fn help_page(user: AuthUser) -> impl IntoResponse {
-    Html(HelpTemplate { username: user.username }.render().unwrap_or_default())
+    Html(
+        HelpTemplate {
+            username: user.username,
+        }
+        .render()
+        .unwrap_or_default(),
+    )
 }

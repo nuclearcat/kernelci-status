@@ -1,8 +1,8 @@
 use askama::Template;
+use axum::Form;
 use axum::extract::{Multipart, State};
 use axum::http::header;
 use axum::response::{Html, IntoResponse};
-use axum::Form;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -28,9 +28,8 @@ pub struct AppConfigView {
 
 impl AppConfigView {
     fn from_map(m: &HashMap<String, String>) -> Self {
-        let g = |k: &str, def: &str| -> String {
-            m.get(k).cloned().unwrap_or_else(|| def.to_string())
-        };
+        let g =
+            |k: &str, def: &str| -> String { m.get(k).cloned().unwrap_or_else(|| def.to_string()) };
         Self {
             check_interval: g("check_interval", "5"),
             check_retries: g("check_retries", "3"),
@@ -99,7 +98,10 @@ pub async fn save_configuration(
     Form(form): Form<ConfigurationForm>,
 ) -> Result<impl IntoResponse, AppError> {
     // Validate scheduler settings
-    let interval_str = form.check_interval.clone().unwrap_or_else(|| "5".to_string());
+    let interval_str = form
+        .check_interval
+        .clone()
+        .unwrap_or_else(|| "5".to_string());
     if let Ok(v) = interval_str.parse::<u32>() {
         if v < 1 || v > 1440 {
             let config = load_config(&state).await?;
@@ -128,7 +130,10 @@ pub async fn save_configuration(
         ));
     }
 
-    let retries_str = form.check_retries.clone().unwrap_or_else(|| "3".to_string());
+    let retries_str = form
+        .check_retries
+        .clone()
+        .unwrap_or_else(|| "3".to_string());
     if let Ok(v) = retries_str.parse::<u32>() {
         if v > 10 {
             let config = load_config(&state).await?;
@@ -157,7 +162,10 @@ pub async fn save_configuration(
         ));
     }
 
-    let warning_retries_str = form.warning_retries.clone().unwrap_or_else(|| "3".to_string());
+    let warning_retries_str = form
+        .warning_retries
+        .clone()
+        .unwrap_or_else(|| "3".to_string());
     if let Ok(v) = warning_retries_str.parse::<u32>() {
         if v > 10 {
             let config = load_config(&state).await?;
@@ -248,11 +256,17 @@ pub async fn save_configuration(
         set_toggle("smtp_ssl", &form.smtp_ssl)?;
         set_toggle("smtp_tls", &form.smtp_tls)?;
         set("email_from", &from_email)?;
-        set("email_from_name", form.email_from_name.as_deref().unwrap_or("KernelCI Status"))?;
+        set(
+            "email_from_name",
+            form.email_from_name.as_deref().unwrap_or("KernelCI Status"),
+        )?;
         // Strip trailing slash from base_url
         let base = form.base_url.as_deref().unwrap_or("").trim_end_matches('/');
         set("base_url", base)?;
-        set("incident_escalation_minutes", form.incident_escalation_minutes.as_deref().unwrap_or("30"))?;
+        set(
+            "incident_escalation_minutes",
+            form.incident_escalation_minutes.as_deref().unwrap_or("30"),
+        )?;
         Ok(())
     })
     .await?;

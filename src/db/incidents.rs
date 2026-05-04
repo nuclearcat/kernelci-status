@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -60,8 +60,7 @@ fn row_to_incident(row: &rusqlite::Row) -> rusqlite::Result<Incident> {
     })
 }
 
-const INCIDENT_COLS: &str =
-    "id, endpoint_id, title, severity, status, assigned_user_id, public_message, \
+const INCIDENT_COLS: &str = "id, endpoint_id, title, severity, status, assigned_user_id, public_message, \
      created_at, acknowledged_at, resolved_at, auto_created, postmortem";
 
 pub fn insert(conn: &Connection, new: &NewIncident) -> rusqlite::Result<i64> {
@@ -82,7 +81,10 @@ pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<Incident
 }
 
 /// Find an open (not resolved) incident for this endpoint.
-pub fn get_open_for_endpoint(conn: &Connection, endpoint_id: i64) -> rusqlite::Result<Option<Incident>> {
+pub fn get_open_for_endpoint(
+    conn: &Connection,
+    endpoint_id: i64,
+) -> rusqlite::Result<Option<Incident>> {
     conn.query_row(
         &format!(
             "SELECT {INCIDENT_COLS} FROM incidents \

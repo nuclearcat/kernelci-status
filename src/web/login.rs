@@ -1,8 +1,8 @@
 use askama::Template;
+use axum::Form;
 use axum::extract::State;
 use axum::http::header::SET_COOKIE;
 use axum::response::{Html, IntoResponse, Redirect, Response};
-use axum::Form;
 use rand::RngExt;
 use serde::Deserialize;
 
@@ -21,11 +21,7 @@ fn session_cookie(token: &str, max_age: u64, secure: bool) -> String {
 }
 
 pub async fn login_page() -> impl IntoResponse {
-    Html(
-        LoginTemplate { error: None }
-            .render()
-            .unwrap_or_default(),
-    )
+    Html(LoginTemplate { error: None }.render().unwrap_or_default())
 }
 
 #[derive(Deserialize)]
@@ -34,10 +30,7 @@ pub struct LoginForm {
     password: String,
 }
 
-pub async fn login_submit(
-    State(state): State<AppState>,
-    Form(form): Form<LoginForm>,
-) -> Response {
+pub async fn login_submit(State(state): State<AppState>, Form(form): Form<LoginForm>) -> Response {
     let username = form.username.clone();
     let db = state.db.clone();
     let user = db

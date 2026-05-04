@@ -1,6 +1,10 @@
 use serde_json::json;
 
-pub async fn send(client: &reqwest::Client, webhook_url: &str, message: &str) -> Result<(), String> {
+pub async fn send(
+    client: &reqwest::Client,
+    webhook_url: &str,
+    message: &str,
+) -> Result<(), String> {
     let body = json!({
         "embeds": [{
             "description": message,

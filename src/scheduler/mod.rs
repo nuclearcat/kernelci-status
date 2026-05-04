@@ -17,10 +17,7 @@ pub async fn run(state: AppState, mut shutdown_rx: watch::Receiver<bool>) {
             info!("No recent checks found, running immediately");
         }
         d => {
-            info!(
-                "Last check was recent, next check in {}s",
-                d.as_secs()
-            );
+            info!("Last check was recent, next check in {}s", d.as_secs());
             tokio::select! {
                 _ = tokio::time::sleep(d) => {}
                 _ = shutdown_rx.changed() => {

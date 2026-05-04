@@ -98,8 +98,8 @@ impl AppConfig {
     pub async fn load(cli: Cli) -> Self {
         let toml_config = load_toml(&cli.config).await;
 
-        let port_was_set = cli.port.is_some()
-            || toml_config.server.as_ref().and_then(|s| s.port).is_some();
+        let port_was_set =
+            cli.port.is_some() || toml_config.server.as_ref().and_then(|s| s.port).is_some();
         let port = cli
             .port
             .or(toml_config.server.as_ref().and_then(|s| s.port))
@@ -110,11 +110,10 @@ impl AppConfig {
             .or(toml_config.database.as_ref().and_then(|d| d.path.clone()))
             .unwrap_or_else(|| "status.db".to_string());
 
-        let (default_username, default_password) =
-            match toml_config.credentials {
-                Some(creds) => (creds.username, creds.password),
-                None => (None, None),
-            };
+        let (default_username, default_password) = match toml_config.credentials {
+            Some(creds) => (creds.username, creds.password),
+            None => (None, None),
+        };
 
         let acme = toml_config.acme.and_then(|a| {
             if !a.enabled.unwrap_or(false) {

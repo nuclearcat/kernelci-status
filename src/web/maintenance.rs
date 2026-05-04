@@ -53,9 +53,7 @@ pub async fn maintenance_page(
         set.into_iter().collect()
     };
 
-    let now_full = chrono::Utc::now()
-        .format("%Y-%m-%d %H:%M:%S")
-        .to_string();
+    let now_full = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     // Build view models with resolved endpoint names and truncated times
     let windows: Vec<WindowView> = windows
@@ -232,9 +230,7 @@ pub async fn close_maintenance(
     _user: AuthUser,
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
-    let ended_at = chrono::Utc::now()
-        .format("%Y-%m-%d %H:%M:%S")
-        .to_string();
+    let ended_at = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let db = state.db.clone();
     let closed = db
         .call(move |conn| crate::db::maintenance::close_early(conn, id, &ended_at))
@@ -254,9 +250,7 @@ pub async fn check_maintenance_reminders(state: &AppState) {
 
     let windows = match db
         .call(|conn| {
-            let now = chrono::Utc::now()
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string();
+            let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
             let windows = crate::db::maintenance::get_needing_reminder(conn, &now)?;
             let endpoints = crate::db::endpoints::list_all(conn)?;
 
@@ -273,7 +267,15 @@ pub async fn check_maintenance_reminders(state: &AppState) {
                 let mut unique: Vec<String> = names;
                 unique.sort();
                 unique.dedup();
-                result.push((w.id, w.name.clone(), w.start_time.clone(), w.end_time.clone(), unique, w.is_deploy, w.changelog.clone()));
+                result.push((
+                    w.id,
+                    w.name.clone(),
+                    w.start_time.clone(),
+                    w.end_time.clone(),
+                    unique,
+                    w.is_deploy,
+                    w.changelog.clone(),
+                ));
             }
             Ok::<_, rusqlite::Error>(result)
         })

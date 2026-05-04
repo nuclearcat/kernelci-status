@@ -12,7 +12,7 @@ mod web;
 use clap::Parser;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{mpsc, watch, RwLock};
+use tokio::sync::{RwLock, mpsc, watch};
 use tracing::info;
 
 use crate::config::{AppConfig, Cli, Commands};
@@ -81,9 +81,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let password = password.clone();
 
         let user_count: i64 = conn
-            .call(|conn| {
-                conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))
-            })
+            .call(|conn| conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0)))
             .await?;
 
         if user_count == 0 {
@@ -174,7 +172,7 @@ async fn serve_with_acme(
     cfg: crate::config::AcmeConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use futures_util::StreamExt;
-    use rustls_acme::{caches::DirCache, AcmeConfig};
+    use rustls_acme::{AcmeConfig, caches::DirCache};
     use std::net::SocketAddr;
 
     // Cache dir must exist and be writable — rustls-acme stores the account
@@ -226,10 +224,11 @@ async fn serve_with_acme(
     // often hit 80 first.
     let http_addr: SocketAddr = ([0, 0, 0, 0], cfg.http_port).into();
     let https_port = cfg.https_port;
-    let redirect_app = axum::Router::new().fallback(move |req: axum::http::Request<axum::body::Body>| {
-        let https_port = https_port;
-        async move { redirect_to_https(req, https_port) }
-    });
+    let redirect_app =
+        axum::Router::new().fallback(move |req: axum::http::Request<axum::body::Body>| {
+            let https_port = https_port;
+            async move { redirect_to_https(req, https_port) }
+        });
     tokio::spawn(async move {
         info!("Starting HTTP redirect listener on {http_addr}");
         match tokio::net::TcpListener::bind(&http_addr).await {
@@ -262,7 +261,7 @@ fn redirect_to_https(
     req: axum::http::Request<axum::body::Body>,
     https_port: u16,
 ) -> axum::response::Response {
-    use axum::http::{header, StatusCode};
+    use axum::http::{StatusCode, header};
     use axum::response::{IntoResponse, Response};
 
     let host = req

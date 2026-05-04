@@ -1,10 +1,10 @@
+use rusqlite;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 use tracing::{error, info};
-use rusqlite;
 
 use crate::checkers::{self, CheckContext, CheckResult, EndpointState};
 use crate::db::endpoints::Endpoint;
@@ -142,15 +142,12 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
         if let Some(condition) = &endpoint.condition {
             if !condition.is_empty() {
                 let past_value = if checkers::condition::parse_diff_hours(condition).is_some() {
-                    let hours =
-                        checkers::condition::parse_diff_hours(condition).unwrap_or(12.0);
+                    let hours = checkers::condition::parse_diff_hours(condition).unwrap_or(12.0);
                     let eid = endpoint.id;
                     let db = state.db.clone();
-                    db.call(move |conn| {
-                        crate::db::history::get_value_hours_ago(conn, eid, hours)
-                    })
-                    .await
-                    .unwrap_or(None)
+                    db.call(move |conn| crate::db::history::get_value_hours_ago(conn, eid, hours))
+                        .await
+                        .unwrap_or(None)
                 } else {
                     None
                 };
@@ -192,13 +189,7 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
         let ss = state_str.clone();
         if let Err(e) = db
             .call(move |conn| -> rusqlite::Result<()> {
-                crate::db::history::insert(
-                    conn,
-                    eid,
-                    value.as_deref(),
-                    &ss,
-                    message.as_deref(),
-                )?;
+                crate::db::history::insert(conn, eid, value.as_deref(), &ss, message.as_deref())?;
                 Ok(())
             })
             .await
@@ -244,9 +235,7 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
             }
 
             // ── Incident auto-management ──
-            let base = state_str
-                .strip_suffix("_MAINTENANCE")
-                .unwrap_or(&state_str);
+            let base = state_str.strip_suffix("_MAINTENANCE").unwrap_or(&state_str);
 
             if base == "CRITICAL" && !new_is_maint {
                 // Auto-create incident if none open for this endpoint
@@ -292,11 +281,7 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
                     if let Ok(inc_id) = inc_id {
                         info!("Auto-created incident #{inc_id} for {}", endpoint.name);
                         crate::web::incidents::send_incident_created_emails(
-                            state,
-                            inc_id,
-                            &title,
-                            &ep_name,
-                            "critical",
+                            state, inc_id, &title, &ep_name, "critical",
                         )
                         .await;
                     }
@@ -307,9 +292,7 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
                 let db = state.db.clone();
                 let _ = db
                     .call(move |conn| -> rusqlite::Result<()> {
-                        if let Some(inc) =
-                            crate::db::incidents::get_open_for_endpoint(conn, eid)?
-                        {
+                        if let Some(inc) = crate::db::incidents::get_open_for_endpoint(conn, eid)? {
                             if inc.auto_created {
                                 crate::db::incidents::update_status(conn, inc.id, "resolved")?;
                                 crate::db::incidents::add_update(

@@ -27,7 +27,10 @@ async fn do_check(endpoint: &Endpoint, ctx: &CheckContext) -> Result<CheckResult
         return Err(format!("Metrics endpoint returned {}", resp.status()));
     }
 
-    let body = resp.text().await.map_err(|e| format!("Failed to read body: {e}"))?;
+    let body = resp
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read body: {e}"))?;
 
     let selector = endpoint.selector.as_deref().unwrap_or("");
     if selector.is_empty() {
@@ -54,12 +57,9 @@ async fn do_check(endpoint: &Endpoint, ctx: &CheckContext) -> Result<CheckResult
             continue;
         }
 
-        let labels_match = labels.iter().all(|(key, val)| {
-            sample
-                .labels
-                .get(key.as_str())
-                .is_some_and(|v| v == val)
-        });
+        let labels_match = labels
+            .iter()
+            .all(|(key, val)| sample.labels.get(key.as_str()).is_some_and(|v| v == val));
 
         if labels_match {
             let value = match &sample.value {
@@ -85,7 +85,9 @@ async fn do_check(endpoint: &Endpoint, ctx: &CheckContext) -> Result<CheckResult
     Ok(CheckResult {
         state: EndpointState::NoData,
         value: None,
-        message: Some(format!("Metric {metric_name} not found with specified labels")),
+        message: Some(format!(
+            "Metric {metric_name} not found with specified labels"
+        )),
     })
 }
 
@@ -97,11 +99,7 @@ fn parse_selector(s: &str) -> Result<(String, Vec<(String, String)>), String> {
         .unwrap_or(s);
 
     let parts: Vec<&str> = s.splitn(2, ',').collect();
-    let metric_name = parts
-        .first()
-        .ok_or("Empty selector")?
-        .trim()
-        .to_string();
+    let metric_name = parts.first().ok_or("Empty selector")?.trim().to_string();
 
     let mut labels = Vec::new();
     if parts.len() > 1 {

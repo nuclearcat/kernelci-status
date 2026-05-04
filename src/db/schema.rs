@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 
 pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(
@@ -420,25 +420,105 @@ mod tests {
             .unwrap();
 
         // http_status: plain https, no magic selector
-        assert_eq!(rows[0], ("api".into(), "https://api.example.com".into(), "http_status".into(), None));
+        assert_eq!(
+            rows[0],
+            (
+                "api".into(),
+                "https://api.example.com".into(),
+                "http_status".into(),
+                None
+            )
+        );
         // http_latency: selector was 'latency', now cleared
-        assert_eq!(rows[1], ("api-lat".into(), "https://api.example.com".into(), "http_latency".into(), None));
+        assert_eq!(
+            rows[1],
+            (
+                "api-lat".into(),
+                "https://api.example.com".into(),
+                "http_latency".into(),
+                None
+            )
+        );
         // tls_cert: selector was 'cert_expiration', now cleared
-        assert_eq!(rows[2], ("api-cert".into(), "https://api.example.com".into(), "tls_cert".into(), None));
+        assert_eq!(
+            rows[2],
+            (
+                "api-cert".into(),
+                "https://api.example.com".into(),
+                "tls_cert".into(),
+                None
+            )
+        );
         // prometheus: promhttps rewritten, /metrics appended
-        assert_eq!(rows[3], ("prom".into(), "https://metrics.example.com/metrics".into(), "prometheus".into(), Some("(http_requests_total,status=500)".into())));
+        assert_eq!(
+            rows[3],
+            (
+                "prom".into(),
+                "https://metrics.example.com/metrics".into(),
+                "prometheus".into(),
+                Some("(http_requests_total,status=500)".into())
+            )
+        );
         // prometheus: promhttp rewritten, /metrics appended
-        assert_eq!(rows[4], ("prom-plain".into(), "http://metrics.example.com/metrics".into(), "prometheus".into(), None));
+        assert_eq!(
+            rows[4],
+            (
+                "prom-plain".into(),
+                "http://metrics.example.com/metrics".into(),
+                "prometheus".into(),
+                None
+            )
+        );
         // prometheus: already had /metrics, no duplication
-        assert_eq!(rows[5], ("prom-metrics".into(), "https://metrics.example.com/metrics".into(), "prometheus".into(), Some("(up)".into())));
+        assert_eq!(
+            rows[5],
+            (
+                "prom-metrics".into(),
+                "https://metrics.example.com/metrics".into(),
+                "prometheus".into(),
+                Some("(up)".into())
+            )
+        );
         // postgresql: unchanged
-        assert_eq!(rows[6], ("pg".into(), "postgresql://user:pass@db/app".into(), "postgresql".into(), Some("SELECT 1".into())));
+        assert_eq!(
+            rows[6],
+            (
+                "pg".into(),
+                "postgresql://user:pass@db/app".into(),
+                "postgresql".into(),
+                Some("SELECT 1".into())
+            )
+        );
         // kubernetes: namespace only
-        assert_eq!(rows[7], ("k8s-ns".into(), "production".into(), "kubernetes".into(), None));
+        assert_eq!(
+            rows[7],
+            (
+                "k8s-ns".into(),
+                "production".into(),
+                "kubernetes".into(),
+                None
+            )
+        );
         // kubernetes: namespace + labels split
-        assert_eq!(rows[8], ("k8s-label".into(), "production".into(), "kubernetes".into(), Some("app=api".into())));
+        assert_eq!(
+            rows[8],
+            (
+                "k8s-label".into(),
+                "production".into(),
+                "kubernetes".into(),
+                Some("app=api".into())
+            )
+        );
         // docker: unchanged
-        assert_eq!(rows[9], ("docker".into(), "ssh://deploy@host".into(), "docker".into(), Some("nginx".into())));
+        assert_eq!(
+            rows[9],
+            (
+                "docker".into(),
+                "ssh://deploy@host".into(),
+                "docker".into(),
+                Some("nginx".into())
+            )
+        );
 
         // Running migration again should be a no-op (column already exists)
         super::migrate_add_check_type(&conn).unwrap();

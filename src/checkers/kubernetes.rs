@@ -25,8 +25,8 @@ async fn do_check(endpoint: &Endpoint) -> Result<CheckResult, String> {
         .await
         .map_err(|_| "Kubeconfig load timed out (15s)".to_string())?
         .map_err(|e| format!("Failed to load kubeconfig: {e}"))?;
-    let client = Client::try_from(config)
-        .map_err(|e| format!("Failed to create k8s client: {e}"))?;
+    let client =
+        Client::try_from(config).map_err(|e| format!("Failed to create k8s client: {e}"))?;
 
     let pods: Api<Pod> = Api::namespaced(client, namespace);
     let mut lp = kube::api::ListParams::default();

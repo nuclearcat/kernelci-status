@@ -1,7 +1,7 @@
 use askama::Template;
+use axum::Form;
 use axum::extract::State;
 use axum::response::{Html, IntoResponse};
-use axum::Form;
 use chrono::Datelike;
 use serde::Deserialize;
 
@@ -78,12 +78,16 @@ pub async fn reports_page(
     user: AuthUser,
 ) -> Result<impl IntoResponse, AppError> {
     let config = state.config_cache.read().await;
-    let weekly_enabled = config.get("report_weekly_enabled").is_some_and(|v| v == "true");
+    let weekly_enabled = config
+        .get("report_weekly_enabled")
+        .is_some_and(|v| v == "true");
     let weekly_day = config
         .get("report_weekly_day")
         .cloned()
         .unwrap_or_else(|| "1".to_string());
-    let monthly_enabled = config.get("report_monthly_enabled").is_some_and(|v| v == "true");
+    let monthly_enabled = config
+        .get("report_monthly_enabled")
+        .is_some_and(|v| v == "true");
     let monthly_day = config
         .get("report_monthly_day")
         .cloned()
@@ -225,10 +229,7 @@ pub async fn report_preview(
     let (period_start, period_end, label) = match report_type.as_str() {
         "monthly" => {
             // Previous calendar month
-            let first_of_this_month = now
-                .date_naive()
-                .with_day(1)
-                .unwrap_or(now.date_naive());
+            let first_of_this_month = now.date_naive().with_day(1).unwrap_or(now.date_naive());
             let last_month_end = first_of_this_month;
             let last_month_start = (last_month_end - chrono::Duration::days(1))
                 .with_day(1)
@@ -319,7 +320,10 @@ pub async fn report_preview(
         .collect();
 
     let total_incidents = incidents.len();
-    let critical_incidents = incidents.iter().filter(|i| i.severity == "critical").count();
+    let critical_incidents = incidents
+        .iter()
+        .filter(|i| i.severity == "critical")
+        .count();
     let resolved_incidents = incidents.iter().filter(|i| i.status == "resolved").count();
 
     let report_incidents: Vec<ReportIncident> = incidents
