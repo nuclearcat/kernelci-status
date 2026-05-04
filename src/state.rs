@@ -10,4 +10,5 @@ pub struct AppState {
     pub http_client: reqwest::Client,
     pub config_cache: Arc<RwLock<HashMap<String, String>>>,
     pub notify_tx: mpsc::Sender<NotificationEvent>,
+    pub secure_cookies: bool,
 }

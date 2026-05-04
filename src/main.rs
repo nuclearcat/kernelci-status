@@ -104,6 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Notification channel
     let (notify_tx, notify_rx) = mpsc::channel(100);
 
+    let secure_cookies = cfg.acme.is_some();
     let app_state = AppState {
         db: conn.clone(),
         http_client: reqwest::Client::builder()
@@ -111,6 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .build()?,
         config_cache: Arc::new(RwLock::new(config_cache)),
         notify_tx,
+        secure_cookies,
     };
 
     // Shutdown signal

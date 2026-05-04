@@ -14,6 +14,12 @@ struct LoginTemplate {
     error: Option<String>,
 }
 
+fn session_cookie(token: &str, max_age: u64, secure: bool) -> String {
+    // Only set Secure when built-in ACME HTTPS is enabled; plain HTTP deployments need cookies to work.
+    let secure_attr = if secure { "; Secure" } else { "" };
+    format!("session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={max_age}{secure_attr}")
+}
+
 pub async fn login_page() -> impl IntoResponse {
     Html(
         LoginTemplate { error: None }
@@ -96,9 +102,7 @@ pub async fn login_submit(
         .into_response();
     }
 
-    let cookie = format!(
-        "session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=604800"
-    );
+    let cookie = session_cookie(&token, 604800, state.secure_cookies);
 
     let mut response = Redirect::to("/admin").into_response();
     response
@@ -124,7 +128,7 @@ pub async fn logout(State(state): State<AppState>, headers: axum::http::HeaderMa
         }
     }
 
-    let cookie = "session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0";
+    let cookie = session_cookie("", 0, state.secure_cookies);
     let mut response = Redirect::to("/login").into_response();
     response
         .headers_mut()
