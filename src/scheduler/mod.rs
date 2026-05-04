@@ -33,6 +33,7 @@ pub async fn run(state: AppState, mut shutdown_rx: watch::Receiver<bool>) {
     if let Err(e) = runner::run_all_checks(&state).await {
         error!("Check cycle failed: {e}");
     }
+    cleanup_expired_sessions(&state).await;
     crate::web::incidents::check_escalations(&state).await;
     crate::web::maintenance::check_maintenance_reminders(&state).await;
 
@@ -49,6 +50,7 @@ pub async fn run(state: AppState, mut shutdown_rx: watch::Receiver<bool>) {
                 if let Err(e) = runner::run_all_checks(&state).await {
                     error!("Check cycle failed: {e}");
                 }
+                cleanup_expired_sessions(&state).await;
                 crate::web::incidents::check_escalations(&state).await;
                 crate::web::maintenance::check_maintenance_reminders(&state).await;
             }
@@ -57,6 +59,18 @@ pub async fn run(state: AppState, mut shutdown_rx: watch::Receiver<bool>) {
                 break;
             }
         }
+    }
+}
+
+async fn cleanup_expired_sessions(state: &AppState) {
+    let db = state.db.clone();
+    match db
+        .call(|conn| crate::db::sessions::delete_expired(conn))
+        .await
+    {
+        Ok(deleted) if deleted > 0 => info!("Cleaned up {deleted} expired sessions"),
+        Ok(_) => {}
+        Err(e) => error!("Failed to clean up expired sessions: {e}"),
     }
 }
 
