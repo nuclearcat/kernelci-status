@@ -255,9 +255,19 @@ pub fn get_unacknowledged_past_threshold(
     let mut stmt = conn.prepare(&format!(
         "SELECT {INCIDENT_COLS} FROM incidents \
          WHERE status = 'detected' \
+         AND escalated_at IS NULL \
          AND created_at < datetime('now', '-' || ?1 || ' minutes') \
          ORDER BY created_at ASC"
     ))?;
     let rows = stmt.query_map(params![minutes], row_to_incident)?;
     rows.collect()
+}
+
+pub fn mark_escalated(conn: &Connection, id: i64) -> rusqlite::Result<bool> {
+    let rows = conn.execute(
+        "UPDATE incidents SET escalated_at = datetime('now') \
+         WHERE id = ?1 AND escalated_at IS NULL",
+        params![id],
+    )?;
+    Ok(rows > 0)
 }

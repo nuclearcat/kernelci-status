@@ -249,6 +249,7 @@ fn migrate_incidents(conn: &Connection) -> rusqlite::Result<()> {
             created_at DATETIME NOT NULL DEFAULT (datetime('now')),
             acknowledged_at DATETIME,
             resolved_at DATETIME,
+            escalated_at DATETIME,
             auto_created INTEGER NOT NULL DEFAULT 0,
             postmortem TEXT
         );
@@ -293,6 +294,19 @@ fn migrate_incidents(conn: &Connection) -> rusqlite::Result<()> {
     };
     if !has_email {
         conn.execute_batch("ALTER TABLE users ADD COLUMN email TEXT")?;
+    }
+
+    // One-way escalation flag: once set, scheduler ticks skip this incident
+    // instead of re-sending escalation emails every interval.
+    let has_escalated_at = {
+        let mut stmt = conn.prepare("PRAGMA table_info(incidents)")?;
+        let names: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?;
+        names.iter().any(|n| n == "escalated_at")
+    };
+    if !has_escalated_at {
+        conn.execute_batch("ALTER TABLE incidents ADD COLUMN escalated_at DATETIME")?;
     }
 
     Ok(())

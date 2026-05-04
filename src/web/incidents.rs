@@ -794,6 +794,18 @@ pub async fn check_escalations(state: &AppState) {
             escalation_minutes
         );
 
+        // Mark before sending so an incident that already got escalated won't
+        // be re-sent on the next scheduler tick.
+        let marked = state
+            .db
+            .clone()
+            .call(move |conn| crate::db::incidents::mark_escalated(conn, inc_id))
+            .await
+            .unwrap_or(false);
+        if !marked {
+            continue;
+        }
+
         send_incident_created_emails(state, inc_id, &incident.title, &ep_name, &incident.severity)
             .await;
     }
