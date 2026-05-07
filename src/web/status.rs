@@ -143,6 +143,14 @@ pub async fn status_page() -> impl IntoResponse {
     )
 }
 
+type StatusDataPayload = (
+    Vec<ServiceGroup>,
+    Vec<MaintenanceBanner>,
+    Vec<MaintenanceBanner>,
+    Vec<IncidentBanner>,
+    Vec<HistoryEvent>,
+);
+
 /// Per-endpoint intermediate data before grouping.
 struct EndpointData {
     subname: String,
@@ -165,13 +173,7 @@ pub async fn status_data(
     let active_range = range_cfg.label.to_string();
 
     let db = state.db.clone();
-    let (groups, active_maintenance, upcoming_maintenance, active_incidents, past_events): (
-        Vec<ServiceGroup>,
-        Vec<MaintenanceBanner>,
-        Vec<MaintenanceBanner>,
-        Vec<IncidentBanner>,
-        Vec<HistoryEvent>,
-    ) = db
+    let (groups, active_maintenance, upcoming_maintenance, active_incidents, past_events): StatusDataPayload = db
         .call(move |conn| {
             let endpoints = crate::db::endpoints::list_all(conn)?;
 
@@ -207,7 +209,7 @@ pub async fn status_data(
                     .map(|h| h.state.clone())
                     .unwrap_or_else(|| "NO_DATA".to_string());
 
-                let slot_states = build_slot_states(&entries, now, hours, slot_minutes);
+                let slot_states = build_slot_states(entries, now, hours, slot_minutes);
 
                 // Absolute uptime: strip _MAINTENANCE suffix, count base state
                 // Exclude NO_DATA entries entirely — they are not failures

@@ -2,13 +2,13 @@
 // SPDX-FileCopyrightText: 2026 Collabora Ltd.
 // Author: Denys Fedoryshchenko <denys.f@collabora.com>
 
-/// Regression tests for rustls CryptoProvider (see rustls 0.23+ requirement).
-///
-/// Without a process-level CryptoProvider installed, any TLS operation panics:
-///   "Could not automatically determine the process-level CryptoProvider"
-///
-/// The application installs it in main(). These tests verify the provider
-/// works correctly so we catch breakage before deployment.
+//! Regression tests for rustls CryptoProvider (see rustls 0.23+ requirement).
+//!
+//! Without a process-level CryptoProvider installed, any TLS operation panics:
+//!   "Could not automatically determine the process-level CryptoProvider"
+//!
+//! The application installs it in main(). These tests verify the provider
+//! works correctly so we catch breakage before deployment.
 
 fn install_provider() {
     let _ = rustls::crypto::ring::default_provider().install_default();

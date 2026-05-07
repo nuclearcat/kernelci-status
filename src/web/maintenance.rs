@@ -311,7 +311,7 @@ pub async fn check_maintenance_reminders(state: &AppState) {
         }
     };
 
-    if !config.get("email_enabled").is_some_and(|v| v == "true") {
+    if config.get("email_enabled").is_none_or(|v| v != "true") {
         return;
     }
 

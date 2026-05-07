@@ -153,7 +153,7 @@ pub async fn save_report_schedule(
     }
 
     let md: u8 = monthly_day.parse().unwrap_or(0);
-    if md < 1 || md > 28 {
+    if !(1..=28).contains(&md) {
         return Ok(Html(
             ReportsTemplate {
                 username: user.username,

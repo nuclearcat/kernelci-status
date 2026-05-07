@@ -108,7 +108,7 @@ pub async fn save_configuration(
         .clone()
         .unwrap_or_else(|| "5".to_string());
     if let Ok(v) = interval_str.parse::<u32>() {
-        if v < 1 || v > 1440 {
+        if !(1..=1440).contains(&v) {
             let config = load_config(&state).await?;
             return Ok(Html(
                 ConfigurationTemplate {
@@ -217,20 +217,18 @@ pub async fn save_configuration(
 
     // Validate port
     let port_str = form.smtp_port.clone().unwrap_or_else(|| "587".to_string());
-    if !port_str.is_empty() {
-        if port_str.parse::<u16>().is_err() {
-            let config = load_config(&state).await?;
-            return Ok(Html(
-                ConfigurationTemplate {
-                    username: user.username,
-                    c: AppConfigView::from_map(&config),
-                    error: "SMTP Port must be a number between 1 and 65535.".to_string(),
-                    success: String::new(),
-                }
-                .render()
-                .unwrap_or_default(),
-            ));
-        }
+    if !port_str.is_empty() && port_str.parse::<u16>().is_err() {
+        let config = load_config(&state).await?;
+        return Ok(Html(
+            ConfigurationTemplate {
+                username: user.username,
+                c: AppConfigView::from_map(&config),
+                error: "SMTP Port must be a number between 1 and 65535.".to_string(),
+                success: String::new(),
+            }
+            .render()
+            .unwrap_or_default(),
+        ));
     }
 
     let db = state.db.clone();

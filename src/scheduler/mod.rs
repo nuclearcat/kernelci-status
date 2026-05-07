@@ -84,7 +84,7 @@ async fn get_interval_mins(state: &AppState) -> u64 {
     cache
         .get("check_interval")
         .and_then(|v| v.parse::<u64>().ok())
-        .filter(|&v| v >= 1 && v <= 1440)
+        .filter(|&v| (1..=1440).contains(&v))
         .unwrap_or(DEFAULT_INTERVAL_MINS)
 }
 
