@@ -4,7 +4,7 @@
 
 [package]
 name = "kernelci-status"
-version = "0.3.3"
+version = "0.3.4"
 edition = "2024"
 rust-version = "1.85"
 description = "Status page and infrastructure monitoring daemon for KernelCI services"
