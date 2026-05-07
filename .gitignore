@@ -1,6 +1,7 @@
 /target/
 /output/
 /pkg/
+/vendor/
 status.db
 status.db-shm
 status.db-wal
