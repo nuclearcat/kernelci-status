@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use rusqlite::{Connection, params};
 
 pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {

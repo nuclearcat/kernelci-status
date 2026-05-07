@@ -1,3 +1,9 @@
+<!--
+SPDX-License-Identifier: LGPL-2.1-only
+SPDX-FileCopyrightText: 2026 Collabora Ltd.
+Author: Denys Fedoryshchenko <denys.f@collabora.com>
+-->
+
 # kernelci-status
 
 `kernelci-status` is a small Rust status page and infrastructure monitoring

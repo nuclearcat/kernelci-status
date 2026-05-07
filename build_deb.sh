@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: LGPL-2.1-only
+# SPDX-FileCopyrightText: 2026 Collabora Ltd.
+# Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 # Build a .deb package for Debian Bookworm inside Docker.
 # Usage: ./build_deb.sh
 # Output: ./output/kernelci-status_<version>_<arch>.deb

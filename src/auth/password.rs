@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use argon2::password_hash::SaltString;
 use argon2::password_hash::rand_core::OsRng;
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
