@@ -19,8 +19,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install rustfmt
-        run: rustup component add rustfmt
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
 
       - name: Check formatting
         run: cargo fmt -- --check
@@ -32,8 +34,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install clippy
-        run: rustup component add clippy
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
