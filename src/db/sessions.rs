@@ -37,5 +37,8 @@ pub fn delete(conn: &Connection, token: &str) -> rusqlite::Result<()> {
 }
 
 pub fn delete_expired(conn: &Connection) -> rusqlite::Result<usize> {
-    conn.execute("DELETE FROM sessions WHERE expires_at <= datetime('now')", [])
+    conn.execute(
+        "DELETE FROM sessions WHERE expires_at <= datetime('now')",
+        [],
+    )
 }

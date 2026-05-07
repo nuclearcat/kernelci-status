@@ -4,19 +4,10 @@ use axum::http::HeaderMap;
 use axum::response::{Html, IntoResponse};
 
 use crate::auth::AuthUser;
-use crate::db::endpoints::Endpoint;
+use crate::db::endpoints::{Endpoint, EndpointWithState};
 use crate::db::history::HistoryEntry;
 use crate::error::AppError;
 use crate::state::AppState;
-
-#[derive(Debug, Clone)]
-pub struct EndpointWithState {
-    pub endpoint: Endpoint,
-    pub state: String,
-    pub value: Option<String>,
-    pub message: Option<String>,
-    pub last_check: Option<String>,
-}
 
 #[derive(Template)]
 #[template(path = "dashboard.html")]
@@ -42,24 +33,7 @@ pub async fn dashboard(
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
     let endpoints: Vec<EndpointWithState> = db
-        .call(|conn| {
-            let eps = crate::db::endpoints::list_all(conn)?;
-            let latest_by_endpoint = crate::db::history::get_latest_by_endpoint(conn)?;
-            let mut result = Vec::new();
-            for ep in eps {
-                let latest = latest_by_endpoint.get(&ep.id);
-                result.push(EndpointWithState {
-                    state: latest
-                        .map(|h| h.state.clone())
-                        .unwrap_or_else(|| "NO_DATA".to_string()),
-                    value: latest.and_then(|h| h.value.clone()),
-                    message: latest.and_then(|h| h.message.clone()),
-                    last_check: latest.map(|h| h.timestamp.clone()),
-                    endpoint: ep,
-                });
-            }
-            Ok(result)
-        })
+        .call(|conn| crate::db::endpoints::list_all_with_latest_state(conn))
         .await?;
 
     let critical_count = endpoints

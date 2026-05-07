@@ -141,8 +141,9 @@ pub async fn run_all_checks(state: &AppState) -> Result<(), String> {
         // Apply condition (can only make state worse)
         if let Some(condition) = &endpoint.condition {
             if !condition.is_empty() {
-                let past_value = if checkers::condition::parse_diff_hours(condition).is_some() {
-                    let hours = checkers::condition::parse_diff_hours(condition).unwrap_or(12.0);
+                let past_value = if let Some(hours) =
+                    checkers::condition::parse_diff_hours(condition)
+                {
                     let eid = endpoint.id;
                     let db = state.db.clone();
                     db.call(move |conn| crate::db::history::get_value_hours_ago(conn, eid, hours))

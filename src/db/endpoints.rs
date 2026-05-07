@@ -1,6 +1,8 @@
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 
+use crate::db::history::HistoryEntry;
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Endpoint {
     pub id: i64,
@@ -13,6 +15,29 @@ pub struct Endpoint {
     pub critical: bool,
     pub enabled: bool,
     pub nodata_behavior: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct EndpointWithState {
+    pub endpoint: Endpoint,
+    pub state: String,
+    pub value: Option<String>,
+    pub message: Option<String>,
+    pub last_check: Option<String>,
+}
+
+impl EndpointWithState {
+    pub fn new(endpoint: Endpoint, latest: Option<&HistoryEntry>) -> Self {
+        Self {
+            state: latest
+                .map(|h| h.state.clone())
+                .unwrap_or_else(|| "NO_DATA".to_string()),
+            value: latest.and_then(|h| h.value.clone()),
+            message: latest.and_then(|h| h.message.clone()),
+            last_check: latest.map(|h| h.timestamp.clone()),
+            endpoint,
+        }
+    }
 }
 
 pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<Endpoint>> {
@@ -35,6 +60,18 @@ pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<Endpoint>> {
         })
     })?;
     rows.collect()
+}
+
+pub fn list_all_with_latest_state(conn: &Connection) -> rusqlite::Result<Vec<EndpointWithState>> {
+    let endpoints = list_all(conn)?;
+    let latest_by_endpoint = crate::db::history::get_latest_by_endpoint(conn)?;
+    Ok(endpoints
+        .into_iter()
+        .map(|endpoint| {
+            let latest = latest_by_endpoint.get(&endpoint.id);
+            EndpointWithState::new(endpoint, latest)
+        })
+        .collect())
 }
 
 pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<Endpoint>> {

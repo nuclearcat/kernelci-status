@@ -3,13 +3,13 @@ use axum::extract::{Path, Query, State};
 use serde::{Deserialize, Serialize};
 
 use crate::auth::ApiAuth;
-use crate::db::endpoints::{Endpoint, NewEndpoint};
+use crate::db::endpoints::{Endpoint, EndpointWithState, NewEndpoint};
 use crate::db::history::HistoryEntry;
 use crate::error::AppError;
 use crate::state::AppState;
 
 #[derive(Serialize)]
-pub struct EndpointWithState {
+pub struct EndpointResponse {
     #[serde(flatten)]
     endpoint: Endpoint,
     current_state: String,
@@ -18,29 +18,29 @@ pub struct EndpointWithState {
     last_check: Option<String>,
 }
 
+impl From<EndpointWithState> for EndpointResponse {
+    fn from(endpoint: EndpointWithState) -> Self {
+        Self {
+            endpoint: endpoint.endpoint,
+            current_state: endpoint.state,
+            current_value: endpoint.value,
+            current_message: endpoint.message,
+            last_check: endpoint.last_check,
+        }
+    }
+}
+
 pub async fn list_endpoints(
     State(state): State<AppState>,
     _auth: ApiAuth,
-) -> Result<Json<Vec<EndpointWithState>>, AppError> {
+) -> Result<Json<Vec<EndpointResponse>>, AppError> {
     let db = state.db.clone();
     let result = db
         .call(|conn| {
-            let eps = crate::db::endpoints::list_all(conn)?;
-            let latest_by_endpoint = crate::db::history::get_latest_by_endpoint(conn)?;
-            let mut result = Vec::new();
-            for ep in eps {
-                let latest = latest_by_endpoint.get(&ep.id);
-                result.push(EndpointWithState {
-                    current_state: latest
-                        .map(|h| h.state.clone())
-                        .unwrap_or_else(|| "NO_DATA".to_string()),
-                    current_value: latest.and_then(|h| h.value.clone()),
-                    current_message: latest.and_then(|h| h.message.clone()),
-                    last_check: latest.map(|h| h.timestamp.clone()),
-                    endpoint: ep,
-                });
-            }
-            Ok(result)
+            Ok(crate::db::endpoints::list_all_with_latest_state(conn)?
+                .into_iter()
+                .map(EndpointResponse::from)
+                .collect())
         })
         .await?;
     Ok(Json(result))
@@ -50,23 +50,17 @@ pub async fn get_endpoint(
     State(state): State<AppState>,
     _auth: ApiAuth,
     Path(id): Path<i64>,
-) -> Result<Json<EndpointWithState>, AppError> {
+) -> Result<Json<EndpointResponse>, AppError> {
     let db = state.db.clone();
     let result = db
         .call(move |conn| {
             let ep = crate::db::endpoints::get_by_id(conn, id)?
                 .ok_or(rusqlite::Error::QueryReturnedNoRows)?;
             let latest = crate::db::history::get_latest_for_endpoint(conn, id)?;
-            Ok(EndpointWithState {
-                current_state: latest
-                    .as_ref()
-                    .map(|h| h.state.clone())
-                    .unwrap_or_else(|| "NO_DATA".to_string()),
-                current_value: latest.as_ref().and_then(|h| h.value.clone()),
-                current_message: latest.as_ref().and_then(|h| h.message.clone()),
-                last_check: latest.map(|h| h.timestamp),
-                endpoint: ep,
-            })
+            Ok(EndpointResponse::from(EndpointWithState::new(
+                ep,
+                latest.as_ref(),
+            )))
         })
         .await?;
     Ok(Json(result))

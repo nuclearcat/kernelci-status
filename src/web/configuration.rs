@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use crate::auth::AuthUser;
 use crate::error::AppError;
 use crate::state::AppState;
+use crate::web::common::{is_valid_email, load_config, load_config_from_db};
 
 pub struct AppConfigView {
     pub check_interval: String,
@@ -360,22 +361,6 @@ pub async fn test_email(
     }
 }
 
-fn is_valid_email(email: &str) -> bool {
-    let parts: Vec<&str> = email.splitn(2, '@').collect();
-    if parts.len() != 2 {
-        return false;
-    }
-    let local = parts[0];
-    let domain = parts[1];
-    if local.is_empty() || domain.is_empty() {
-        return false;
-    }
-    if !domain.contains('.') {
-        return false;
-    }
-    !email.contains(' ')
-}
-
 pub async fn download_backup(
     State(state): State<AppState>,
     _user: AuthUser,
@@ -546,19 +531,4 @@ async fn render_with_error(
         .unwrap_or_default(),
     )
     .into_response())
-}
-
-async fn load_config(state: &AppState) -> Result<HashMap<String, String>, AppError> {
-    load_config_from_db(state).await.map_err(|e| e.into())
-}
-
-async fn load_config_from_db(
-    state: &AppState,
-) -> Result<HashMap<String, String>, crate::error::DbError> {
-    let db = state.db.clone();
-    db.call(|conn| {
-        let pairs = crate::db::config::get_all(conn)?;
-        Ok(pairs.into_iter().collect())
-    })
-    .await
 }
