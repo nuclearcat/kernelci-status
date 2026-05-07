@@ -88,3 +88,9 @@ thiserror = "2"
 
 # Misc
 axum-extra = { version = "0.12", features = ["cookie", "form"] }
+
+# Upstream PR #93 fixes ACME challenge deserialization when a CA advertises
+# token-less challenge types such as dns-persist-01. Drop this patch once a
+# rustls-acme release includes that fix.
+[patch.crates-io]
+rustls-acme = { git = "https://github.com/bunert/rustls-acme", rev = "2317827e4a666d31abe28ceb88b74597fc26a828" }

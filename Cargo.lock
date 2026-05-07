@@ -2939,8 +2939,7 @@ dependencies = [
 [[package]]
 name = "rustls-acme"
 version = "0.15.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7dcdaa66cd3bf55140f4061b0bb596650d5e8f7f0183cd263fba2a57cf740b96"
+source = "git+https://github.com/bunert/rustls-acme?rev=2317827e4a666d31abe28ceb88b74597fc26a828#2317827e4a666d31abe28ceb88b74597fc26a828"
 dependencies = [
  "async-io",
  "async-trait",
