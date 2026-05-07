@@ -24,7 +24,13 @@
             Recipient Email Addresses
             <input type="text" name="email_to" value="{{ c.email_to }}"
                    placeholder="admin@example.com, ops@example.com">
-            <small>Comma-separated list of email addresses that will receive status change alerts.</small>
+            <small>Comma-separated list. Receives critical-related transitions (any change involving CRITICAL), plus maintenance and incident emails.</small>
+        </label>
+        <label>
+            Warning Recipient Email Addresses
+            <input type="text" name="email_to_warnings" value="{{ c.email_to_warnings }}"
+                   placeholder="warnings@example.com">
+            <small>Comma-separated list. Receives only WARNING&nbsp;↔&nbsp;OK transitions. Leave empty to suppress warning emails entirely.</small>
         </label>
     </article>
 

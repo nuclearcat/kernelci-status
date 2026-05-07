@@ -70,10 +70,13 @@ fn from_mailbox(config: &HashMap<String, String>) -> Result<Mailbox, String> {
     }
 }
 
-/// Parse comma-separated recipients into a list of Mailboxes.
-fn recipient_mailboxes(config: &HashMap<String, String>) -> Result<Vec<Mailbox>, String> {
+/// Parse a comma-separated recipient list (from the given config key) into Mailboxes.
+fn recipient_mailboxes_from(
+    config: &HashMap<String, String>,
+    key: &str,
+) -> Result<Vec<Mailbox>, String> {
     let to_str = config
-        .get("email_to")
+        .get(key)
         .filter(|t| !t.is_empty())
         .ok_or("No recipient email addresses configured")?;
 
@@ -94,14 +97,38 @@ fn recipient_mailboxes(config: &HashMap<String, String>) -> Result<Vec<Mailbox>,
     Ok(mailboxes)
 }
 
+/// Parse the default ("email_to") recipient list.
+fn recipient_mailboxes(config: &HashMap<String, String>) -> Result<Vec<Mailbox>, String> {
+    recipient_mailboxes_from(config, "email_to")
+}
+
+/// Pick the recipient-list config key for a given state transition.
+/// WARNING ↔ OK transitions go to the warnings list; everything else
+/// (anything involving CRITICAL, or unknown states) goes to the default list.
+fn recipient_key_for_transition(old_state: &str, new_state: &str) -> &'static str {
+    let is_ok_warn = |s: &str| s == "OK" || s == "WARNING";
+    if is_ok_warn(old_state) && is_ok_warn(new_state) {
+        "email_to_warnings"
+    } else {
+        "email_to"
+    }
+}
+
 /// Send a status-change notification email.
 pub async fn send_notification(
     config: &HashMap<String, String>,
     event: &NotificationEvent,
 ) -> Result<(), String> {
+    let key = recipient_key_for_transition(&event.old_state, &event.new_state);
+    // Empty recipient list is a valid "suppress" signal — especially for the
+    // warnings list, which users may leave blank to silence warning emails.
+    if config.get(key).map(|s| s.trim().is_empty()).unwrap_or(true) {
+        return Ok(());
+    }
+
     let transport = build_transport(config)?;
     let from = from_mailbox(config)?;
-    let recipients = recipient_mailboxes(config)?;
+    let recipients = recipient_mailboxes_from(config, key)?;
 
     let display_name = match &event.subname {
         Some(sub) => format!("{} ({})", event.endpoint_name, sub),

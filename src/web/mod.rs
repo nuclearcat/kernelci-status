@@ -1,3 +1,4 @@
+pub mod common;
 pub mod configuration;
 pub mod dashboard;
 pub mod endpoints;
