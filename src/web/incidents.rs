@@ -1,7 +1,11 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use askama::Template;
+use axum::Form;
 use axum::extract::{Path, State};
 use axum::response::{Html, IntoResponse, Redirect};
-use axum::Form;
 use serde::Deserialize;
 
 use crate::auth::AuthUser;
@@ -61,11 +65,9 @@ pub async fn incidents_page(
                     let ep_name = eps
                         .iter()
                         .find(|e| e.id == inc.endpoint_id)
-                        .map(|e| {
-                            match &e.subname {
-                                Some(sub) => format!("{} ({})", e.name, sub),
-                                None => e.name.clone(),
-                            }
+                        .map(|e| match &e.subname {
+                            Some(sub) => format!("{} ({})", e.name, sub),
+                            None => e.name.clone(),
                         })
                         .unwrap_or_else(|| format!("Endpoint #{}", inc.endpoint_id));
                     let assigned = inc
@@ -483,7 +485,10 @@ pub async fn incident_token_action(
             };
 
             let user = crate::db::users::get_by_id(conn, token.user_id)?;
-            let username = user.as_ref().map(|u| u.username.clone()).unwrap_or_default();
+            let username = user
+                .as_ref()
+                .map(|u| u.username.clone())
+                .unwrap_or_default();
             let user_email = user.as_ref().and_then(|u| u.email.clone());
 
             // Perform the action
@@ -667,7 +672,13 @@ pub async fn send_incident_created_emails(
     let ep_name = endpoint_name.to_string();
     let sev = severity.to_string();
 
-    type EmailResult = (std::collections::HashMap<String, String>, Vec<(String, String, String)>, String, String, String);
+    type EmailResult = (
+        std::collections::HashMap<String, String>,
+        Vec<(String, String, String)>,
+        String,
+        String,
+        String,
+    );
     let result: Result<EmailResult, _> = db
         .call(move |conn| -> rusqlite::Result<EmailResult> {
             let users = crate::db::users::list_with_email(conn)?;
@@ -787,13 +798,19 @@ pub async fn check_escalations(state: &AppState) {
             escalation_minutes
         );
 
-        send_incident_created_emails(
-            state,
-            inc_id,
-            &incident.title,
-            &ep_name,
-            &incident.severity,
-        )
-        .await;
+        // Mark before sending so an incident that already got escalated won't
+        // be re-sent on the next scheduler tick.
+        let marked = state
+            .db
+            .clone()
+            .call(move |conn| crate::db::incidents::mark_escalated(conn, inc_id))
+            .await
+            .unwrap_or(false);
+        if !marked {
+            continue;
+        }
+
+        send_incident_created_emails(state, inc_id, &incident.title, &ep_name, &incident.severity)
+            .await;
     }
 }

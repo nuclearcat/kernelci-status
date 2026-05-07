@@ -1,6 +1,10 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
-use std::path::Path;
+use std::io::ErrorKind;
 use tracing::{info, warn};
 
 /// TOML configuration file structure
@@ -95,11 +99,11 @@ impl AppConfig {
     /// 1. CLI arguments
     /// 2. TOML config file
     /// 3. Built-in defaults
-    pub fn load(cli: Cli) -> Self {
-        let toml_config = load_toml(&cli.config);
+    pub async fn load(cli: Cli) -> Self {
+        let toml_config = load_toml(&cli.config).await;
 
-        let port_was_set = cli.port.is_some()
-            || toml_config.server.as_ref().and_then(|s| s.port).is_some();
+        let port_was_set =
+            cli.port.is_some() || toml_config.server.as_ref().and_then(|s| s.port).is_some();
         let port = cli
             .port
             .or(toml_config.server.as_ref().and_then(|s| s.port))
@@ -110,11 +114,10 @@ impl AppConfig {
             .or(toml_config.database.as_ref().and_then(|d| d.path.clone()))
             .unwrap_or_else(|| "status.db".to_string());
 
-        let (default_username, default_password) =
-            match toml_config.credentials {
-                Some(creds) => (creds.username, creds.password),
-                None => (None, None),
-            };
+        let (default_username, default_password) = match toml_config.credentials {
+            Some(creds) => (creds.username, creds.password),
+            None => (None, None),
+        };
 
         let acme = toml_config.acme.and_then(|a| {
             if !a.enabled.unwrap_or(false) {
@@ -155,26 +158,24 @@ impl AppConfig {
     }
 }
 
-fn load_toml(path: &str) -> TomlConfig {
-    let path = Path::new(path);
-    if !path.exists() {
-        info!("Config file {} not found, using defaults", path.display());
-        return TomlConfig::default();
-    }
-
-    match std::fs::read_to_string(path) {
+async fn load_toml(path: &str) -> TomlConfig {
+    match tokio::fs::read_to_string(path).await {
         Ok(content) => match toml::from_str::<TomlConfig>(&content) {
             Ok(config) => {
-                info!("Loaded configuration from {}", path.display());
+                info!("Loaded configuration from {path}");
                 config
             }
             Err(e) => {
-                warn!("Failed to parse {}: {e}, using defaults", path.display());
+                warn!("Failed to parse {path}: {e}, using defaults");
                 TomlConfig::default()
             }
         },
+        Err(e) if e.kind() == ErrorKind::NotFound => {
+            info!("Config file {path} not found, using defaults");
+            TomlConfig::default()
+        }
         Err(e) => {
-            warn!("Failed to read {}: {e}, using defaults", path.display());
+            warn!("Failed to read {path}: {e}, using defaults");
             TomlConfig::default()
         }
     }

@@ -1,6 +1,10 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 
 use crate::notifications::NotificationEvent;
 
@@ -10,4 +14,5 @@ pub struct AppState {
     pub http_client: reqwest::Client,
     pub config_cache: Arc<RwLock<HashMap<String, String>>>,
     pub notify_tx: mpsc::Sender<NotificationEvent>,
+    pub secure_cookies: bool,
 }

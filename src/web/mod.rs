@@ -1,20 +1,25 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
+pub mod common;
 pub mod configuration;
 pub mod dashboard;
 pub mod endpoints;
 pub mod help;
 pub mod history;
 pub mod incidents;
-pub mod maintenance;
 pub mod login;
+pub mod maintenance;
 pub mod notifications;
 pub mod reports;
 pub mod status;
 pub mod users;
 
-use axum::extract::DefaultBodyLimit;
-use axum::http::{header, HeaderValue};
-use axum::response::IntoResponse;
 use axum::Router;
+use axum::extract::DefaultBodyLimit;
+use axum::http::{HeaderValue, header};
+use axum::response::IntoResponse;
 use tower_http::set_header::SetResponseHeaderLayer;
 
 const RESTORE_BODY_LIMIT: usize = 128 * 1024 * 1024;

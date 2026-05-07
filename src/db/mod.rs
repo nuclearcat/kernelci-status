@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 pub mod config;
 pub mod endpoints;
 pub mod history;
@@ -13,9 +17,9 @@ use tokio_rusqlite::Connection;
 use crate::error::AppError;
 
 pub async fn open_and_migrate(path: &str) -> Result<Connection, AppError> {
-    let conn = Connection::open(path).await.map_err(|_| {
-        AppError::Internal("Failed to open database".to_string())
-    })?;
+    let conn = Connection::open(path)
+        .await
+        .map_err(|_| AppError::Internal("Failed to open database".to_string()))?;
 
     conn.call(|conn| {
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;

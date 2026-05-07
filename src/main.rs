@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 mod api;
 mod auth;
 mod checkers;
@@ -12,7 +16,7 @@ mod web;
 use clap::Parser;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{mpsc, watch, RwLock};
+use tokio::sync::{RwLock, mpsc, watch};
 use tracing::info;
 
 use crate::config::{AppConfig, Cli, Commands};
@@ -31,13 +35,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let cli = Cli::parse();
-    let cfg = AppConfig::load(cli);
+    let cfg = AppConfig::load(cli).await;
 
     // Ensure parent directory exists for the database
     if let Some(parent) = std::path::Path::new(&cfg.db_path).parent() {
-        if !parent.as_os_str().is_empty() && !parent.exists() {
-            std::fs::create_dir_all(parent)?;
-            info!("Created database directory: {}", parent.display());
+        if !parent.as_os_str().is_empty() {
+            match tokio::fs::metadata(parent).await {
+                Ok(_) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    tokio::fs::create_dir_all(parent).await?;
+                    info!("Created database directory: {}", parent.display());
+                }
+                Err(e) => return Err(e.into()),
+            }
         }
     }
 
@@ -75,9 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let password = password.clone();
 
         let user_count: i64 = conn
-            .call(|conn| {
-                conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))
-            })
+            .call(|conn| conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0)))
             .await?;
 
         if user_count == 0 {
@@ -104,6 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Notification channel
     let (notify_tx, notify_rx) = mpsc::channel(100);
 
+    let secure_cookies = cfg.acme.is_some();
     let app_state = AppState {
         db: conn.clone(),
         http_client: reqwest::Client::builder()
@@ -111,6 +120,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .build()?,
         config_cache: Arc::new(RwLock::new(config_cache)),
         notify_tx,
+        secure_cookies,
     };
 
     // Shutdown signal
@@ -166,14 +176,14 @@ async fn serve_with_acme(
     cfg: crate::config::AcmeConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use futures_util::StreamExt;
-    use rustls_acme::{caches::DirCache, AcmeConfig};
+    use rustls_acme::{AcmeConfig, caches::DirCache};
     use std::net::SocketAddr;
 
     // Cache dir must exist and be writable — rustls-acme stores the account
     // key and issued certs here, which is what makes renewal automatic across
     // restarts (it will reuse a cert that still has >30d of validity, and
     // renew in-place when it gets close to expiry).
-    std::fs::create_dir_all(&cfg.cache_dir)?;
+    tokio::fs::create_dir_all(&cfg.cache_dir).await?;
 
     info!(
         "ACME enabled: domains={:?}, staging={}, cache_dir={}",
@@ -218,10 +228,11 @@ async fn serve_with_acme(
     // often hit 80 first.
     let http_addr: SocketAddr = ([0, 0, 0, 0], cfg.http_port).into();
     let https_port = cfg.https_port;
-    let redirect_app = axum::Router::new().fallback(move |req: axum::http::Request<axum::body::Body>| {
-        let https_port = https_port;
-        async move { redirect_to_https(req, https_port) }
-    });
+    let redirect_app =
+        axum::Router::new().fallback(move |req: axum::http::Request<axum::body::Body>| {
+            let https_port = https_port;
+            async move { redirect_to_https(req, https_port) }
+        });
     tokio::spawn(async move {
         info!("Starting HTTP redirect listener on {http_addr}");
         match tokio::net::TcpListener::bind(&http_addr).await {
@@ -254,7 +265,7 @@ fn redirect_to_https(
     req: axum::http::Request<axum::body::Body>,
     https_port: u16,
 ) -> axum::response::Response {
-    use axum::http::{header, StatusCode};
+    use axum::http::{StatusCode, header};
     use axum::response::{IntoResponse, Response};
 
     let host = req

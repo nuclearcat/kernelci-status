@@ -1,22 +1,17 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use askama::Template;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::{Html, IntoResponse};
 
 use crate::auth::AuthUser;
-use crate::db::endpoints::Endpoint;
+use crate::db::endpoints::{Endpoint, EndpointWithState};
 use crate::db::history::HistoryEntry;
 use crate::error::AppError;
 use crate::state::AppState;
-
-#[derive(Debug, Clone)]
-pub struct EndpointWithState {
-    pub endpoint: Endpoint,
-    pub state: String,
-    pub value: Option<String>,
-    pub message: Option<String>,
-    pub last_check: Option<String>,
-}
 
 #[derive(Template)]
 #[template(path = "dashboard.html")]
@@ -42,38 +37,27 @@ pub async fn dashboard(
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
     let endpoints: Vec<EndpointWithState> = db
-        .call(|conn| {
-            let eps = crate::db::endpoints::list_all(conn)?;
-            let mut result = Vec::new();
-            for ep in eps {
-                let latest = crate::db::history::get_latest_for_endpoint(conn, ep.id)?;
-                result.push(EndpointWithState {
-                    state: latest
-                        .as_ref()
-                        .map(|h| h.state.clone())
-                        .unwrap_or_else(|| "NO_DATA".to_string()),
-                    value: latest.as_ref().and_then(|h| h.value.clone()),
-                    message: latest.as_ref().and_then(|h| h.message.clone()),
-                    last_check: latest.map(|h| h.timestamp),
-                    endpoint: ep,
-                });
-            }
-            Ok(result)
-        })
+        .call(|conn| crate::db::endpoints::list_all_with_latest_state(conn))
         .await?;
 
-    let critical_count = endpoints.iter().filter(|e| {
-        e.state == "CRITICAL" || e.state == "CRITICAL_MAINTENANCE"
-    }).count();
-    let warning_count = endpoints.iter().filter(|e| {
-        e.state == "WARNING" || e.state == "WARNING_MAINTENANCE"
-    }).count();
-    let ok_count = endpoints.iter().filter(|e| {
-        e.state == "OK" || e.state == "OK_MAINTENANCE"
-    }).count();
-    let nodata_count = endpoints.iter().filter(|e| {
-        e.state == "NO_DATA" || e.state == "NO_DATA_MAINTENANCE" || e.state == "MAINTENANCE"
-    }).count();
+    let critical_count = endpoints
+        .iter()
+        .filter(|e| e.state == "CRITICAL" || e.state == "CRITICAL_MAINTENANCE")
+        .count();
+    let warning_count = endpoints
+        .iter()
+        .filter(|e| e.state == "WARNING" || e.state == "WARNING_MAINTENANCE")
+        .count();
+    let ok_count = endpoints
+        .iter()
+        .filter(|e| e.state == "OK" || e.state == "OK_MAINTENANCE")
+        .count();
+    let nodata_count = endpoints
+        .iter()
+        .filter(|e| {
+            e.state == "NO_DATA" || e.state == "NO_DATA_MAINTENANCE" || e.state == "MAINTENANCE"
+        })
+        .count();
 
     let is_htmx = headers.get("HX-Request").is_some();
     if is_htmx {

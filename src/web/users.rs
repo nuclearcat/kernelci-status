@@ -1,7 +1,11 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use askama::Template;
+use axum::Form;
 use axum::extract::{Path, State};
 use axum::response::{Html, IntoResponse, Redirect};
-use axum::Form;
 use serde::Deserialize;
 
 use crate::auth::AuthUser;
@@ -21,9 +25,7 @@ pub async fn users_page(
     user: AuthUser,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
-    let users = db
-        .call(|conn| crate::db::users::list_all(conn))
-        .await?;
+    let users = db.call(|conn| crate::db::users::list_all(conn)).await?;
 
     Ok(Html(
         UsersTemplate {

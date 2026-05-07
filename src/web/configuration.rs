@@ -1,14 +1,19 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use askama::Template;
+use axum::Form;
 use axum::extract::{Multipart, State};
 use axum::http::header;
 use axum::response::{Html, IntoResponse};
-use axum::Form;
 use serde::Deserialize;
 use std::collections::HashMap;
 
 use crate::auth::AuthUser;
 use crate::error::AppError;
 use crate::state::AppState;
+use crate::web::common::{is_valid_email, load_config, load_config_from_db};
 
 pub struct AppConfigView {
     pub check_interval: String,
@@ -28,9 +33,8 @@ pub struct AppConfigView {
 
 impl AppConfigView {
     fn from_map(m: &HashMap<String, String>) -> Self {
-        let g = |k: &str, def: &str| -> String {
-            m.get(k).cloned().unwrap_or_else(|| def.to_string())
-        };
+        let g =
+            |k: &str, def: &str| -> String { m.get(k).cloned().unwrap_or_else(|| def.to_string()) };
         Self {
             check_interval: g("check_interval", "5"),
             check_retries: g("check_retries", "3"),
@@ -99,9 +103,12 @@ pub async fn save_configuration(
     Form(form): Form<ConfigurationForm>,
 ) -> Result<impl IntoResponse, AppError> {
     // Validate scheduler settings
-    let interval_str = form.check_interval.clone().unwrap_or_else(|| "5".to_string());
+    let interval_str = form
+        .check_interval
+        .clone()
+        .unwrap_or_else(|| "5".to_string());
     if let Ok(v) = interval_str.parse::<u32>() {
-        if v < 1 || v > 1440 {
+        if !(1..=1440).contains(&v) {
             let config = load_config(&state).await?;
             return Ok(Html(
                 ConfigurationTemplate {
@@ -128,7 +135,10 @@ pub async fn save_configuration(
         ));
     }
 
-    let retries_str = form.check_retries.clone().unwrap_or_else(|| "3".to_string());
+    let retries_str = form
+        .check_retries
+        .clone()
+        .unwrap_or_else(|| "3".to_string());
     if let Ok(v) = retries_str.parse::<u32>() {
         if v > 10 {
             let config = load_config(&state).await?;
@@ -157,7 +167,10 @@ pub async fn save_configuration(
         ));
     }
 
-    let warning_retries_str = form.warning_retries.clone().unwrap_or_else(|| "3".to_string());
+    let warning_retries_str = form
+        .warning_retries
+        .clone()
+        .unwrap_or_else(|| "3".to_string());
     if let Ok(v) = warning_retries_str.parse::<u32>() {
         if v > 10 {
             let config = load_config(&state).await?;
@@ -204,20 +217,18 @@ pub async fn save_configuration(
 
     // Validate port
     let port_str = form.smtp_port.clone().unwrap_or_else(|| "587".to_string());
-    if !port_str.is_empty() {
-        if port_str.parse::<u16>().is_err() {
-            let config = load_config(&state).await?;
-            return Ok(Html(
-                ConfigurationTemplate {
-                    username: user.username,
-                    c: AppConfigView::from_map(&config),
-                    error: "SMTP Port must be a number between 1 and 65535.".to_string(),
-                    success: String::new(),
-                }
-                .render()
-                .unwrap_or_default(),
-            ));
-        }
+    if !port_str.is_empty() && port_str.parse::<u16>().is_err() {
+        let config = load_config(&state).await?;
+        return Ok(Html(
+            ConfigurationTemplate {
+                username: user.username,
+                c: AppConfigView::from_map(&config),
+                error: "SMTP Port must be a number between 1 and 65535.".to_string(),
+                success: String::new(),
+            }
+            .render()
+            .unwrap_or_default(),
+        ));
     }
 
     let db = state.db.clone();
@@ -248,11 +259,17 @@ pub async fn save_configuration(
         set_toggle("smtp_ssl", &form.smtp_ssl)?;
         set_toggle("smtp_tls", &form.smtp_tls)?;
         set("email_from", &from_email)?;
-        set("email_from_name", form.email_from_name.as_deref().unwrap_or("KernelCI Status"))?;
+        set(
+            "email_from_name",
+            form.email_from_name.as_deref().unwrap_or("KernelCI Status"),
+        )?;
         // Strip trailing slash from base_url
         let base = form.base_url.as_deref().unwrap_or("").trim_end_matches('/');
         set("base_url", base)?;
-        set("incident_escalation_minutes", form.incident_escalation_minutes.as_deref().unwrap_or("30"))?;
+        set(
+            "incident_escalation_minutes",
+            form.incident_escalation_minutes.as_deref().unwrap_or("30"),
+        )?;
         Ok(())
     })
     .await?;
@@ -344,22 +361,6 @@ pub async fn test_email(
             .unwrap_or_default(),
         )),
     }
-}
-
-fn is_valid_email(email: &str) -> bool {
-    let parts: Vec<&str> = email.splitn(2, '@').collect();
-    if parts.len() != 2 {
-        return false;
-    }
-    let local = parts[0];
-    let domain = parts[1];
-    if local.is_empty() || domain.is_empty() {
-        return false;
-    }
-    if !domain.contains('.') {
-        return false;
-    }
-    !email.contains(' ')
 }
 
 pub async fn download_backup(
@@ -532,19 +533,4 @@ async fn render_with_error(
         .unwrap_or_default(),
     )
     .into_response())
-}
-
-async fn load_config(state: &AppState) -> Result<HashMap<String, String>, AppError> {
-    load_config_from_db(state).await.map_err(|e| e.into())
-}
-
-async fn load_config_from_db(
-    state: &AppState,
-) -> Result<HashMap<String, String>, crate::error::DbError> {
-    let db = state.db.clone();
-    db.call(|conn| {
-        let pairs = crate::db::config::get_all(conn)?;
-        Ok(pairs.into_iter().collect())
-    })
-    .await
 }

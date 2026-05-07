@@ -1,6 +1,10 @@
+# SPDX-License-Identifier: LGPL-2.1-only
+# SPDX-FileCopyrightText: 2026 Collabora Ltd.
+# Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 [package]
 name = "kernelci-status"
-version = "0.3.3"
+version = "0.3.5"
 edition = "2024"
 rust-version = "1.85"
 description = "Status page and infrastructure monitoring daemon for KernelCI services"
@@ -61,6 +65,7 @@ lettre = { version = "0.11", default-features = false, features = ["tokio1-rustl
 # Password hashing
 argon2 = "0.5"
 rand_core = { version = "0.6", features = ["getrandom"] }
+subtle = "2"
 
 # Session tokens
 rand = "0.10"
@@ -84,9 +89,8 @@ thiserror = "2"
 # Misc
 axum-extra = { version = "0.12", features = ["cookie", "form"] }
 
-# Local patch: rustls-acme 0.15.1 deserializes authorizations with a required
-# `token` on each Challenge, which breaks against Let's Encrypt now that
-# `dns-persist-01` (no token) is advertised. Upstream fix pending in
-# rustls-acme#92; vendor a patched copy in-tree until a release lands.
+# Upstream PR #93 fixes ACME challenge deserialization when a CA advertises
+# token-less challenge types such as dns-persist-01. Drop this patch once a
+# rustls-acme release includes that fix.
 [patch.crates-io]
-rustls-acme = { path = "vendor/rustls-acme" }
+rustls-acme = { git = "https://github.com/bunert/rustls-acme", rev = "2317827e4a666d31abe28ceb88b74597fc26a828" }

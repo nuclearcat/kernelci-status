@@ -1,5 +1,9 @@
-use axum::extract::State;
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use axum::Json;
+use axum::extract::State;
 use serde::Serialize;
 
 use crate::auth::ApiAuth;
@@ -23,13 +27,13 @@ pub async fn status(
     let summary = db
         .call(|conn| {
             let eps = crate::db::endpoints::list_all(conn)?;
+            let latest_by_endpoint = crate::db::history::get_latest_by_endpoint(conn)?;
             let mut ok = 0usize;
             let mut warning = 0usize;
             let mut critical = 0usize;
             let mut no_data = 0usize;
             for ep in &eps {
-                let latest = crate::db::history::get_latest_for_endpoint(conn, ep.id)?;
-                match latest.as_ref().map(|h| h.state.as_str()) {
+                match latest_by_endpoint.get(&ep.id).map(|h| h.state.as_str()) {
                     Some("OK") => ok += 1,
                     Some("WARNING") => warning += 1,
                     Some("CRITICAL") => critical += 1,

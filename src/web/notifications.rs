@@ -1,33 +1,39 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use askama::Template;
+use axum::Form;
 use axum::extract::State;
 use axum::response::{Html, IntoResponse};
-use axum::Form;
 use serde::Deserialize;
 use std::collections::HashMap;
 
 use crate::auth::AuthUser;
 use crate::error::AppError;
 use crate::state::AppState;
+use crate::web::common::{is_valid_email, load_config, load_config_from_db};
 
 pub struct NotifConfig {
     pub discord_enabled: bool,
     pub discord_webhook_url: String,
     pub email_enabled: bool,
     pub email_to: String,
+    pub email_to_warnings: String,
     pub textfile_enabled: bool,
     pub textfile_path: String,
 }
 
 impl NotifConfig {
     fn from_map(m: &HashMap<String, String>) -> Self {
-        let g = |k: &str, def: &str| -> String {
-            m.get(k).cloned().unwrap_or_else(|| def.to_string())
-        };
+        let g =
+            |k: &str, def: &str| -> String { m.get(k).cloned().unwrap_or_else(|| def.to_string()) };
         Self {
             discord_enabled: m.get("discord_enabled").is_some_and(|v| v == "true"),
             discord_webhook_url: g("discord_webhook_url", ""),
             email_enabled: m.get("email_enabled").is_some_and(|v| v == "true"),
             email_to: g("email_to", ""),
+            email_to_warnings: g("email_to_warnings", ""),
             textfile_enabled: m.get("textfile_enabled").is_some_and(|v| v == "true"),
             textfile_path: g("textfile_path", ""),
         }
@@ -67,6 +73,7 @@ pub struct NotificationForm {
     pub discord_webhook_url: Option<String>,
     pub email_enabled: Option<String>,
     pub email_to: Option<String>,
+    pub email_to_warnings: Option<String>,
     pub textfile_enabled: Option<String>,
     pub textfile_path: Option<String>,
 }
@@ -96,49 +103,38 @@ fn validate_emails(raw: &str) -> Result<String, String> {
     Ok(valid.join(", "))
 }
 
-fn is_valid_email(email: &str) -> bool {
-    let parts: Vec<&str> = email.splitn(2, '@').collect();
-    if parts.len() != 2 {
-        return false;
-    }
-    let local = parts[0];
-    let domain = parts[1];
-    if local.is_empty() || domain.is_empty() {
-        return false;
-    }
-    if !domain.contains('.') {
-        return false;
-    }
-    // No spaces allowed
-    !email.contains(' ')
-}
-
 pub async fn save_notifications(
     State(state): State<AppState>,
     user: AuthUser,
     Form(form): Form<NotificationForm>,
 ) -> Result<impl IntoResponse, AppError> {
     let email_to_raw = form.email_to.clone().unwrap_or_default();
+    let email_to_warnings_raw = form.email_to_warnings.clone().unwrap_or_default();
 
     // Validate emails if email is being enabled
-    if let Err(err) = validate_emails(&email_to_raw) {
-        let config = load_config(&state).await?;
-        let mut c = NotifConfig::from_map(&config);
-        // Show what the user typed so they can fix it
-        c.email_to = email_to_raw;
-        return Ok(Html(
-            NotificationsTemplate {
-                username: user.username,
-                c,
-                error: err,
-                success: String::new(),
-            }
-            .render()
-            .unwrap_or_default(),
-        ));
-    }
+    let validation = validate_emails(&email_to_raw)
+        .and_then(|main| validate_emails(&email_to_warnings_raw).map(|warn| (main, warn)));
 
-    let cleaned_emails = validate_emails(&email_to_raw).unwrap_or_default();
+    let (cleaned_emails, cleaned_warning_emails) = match validation {
+        Ok(pair) => pair,
+        Err(err) => {
+            let config = load_config(&state).await?;
+            let mut c = NotifConfig::from_map(&config);
+            // Show what the user typed so they can fix it
+            c.email_to = email_to_raw;
+            c.email_to_warnings = email_to_warnings_raw;
+            return Ok(Html(
+                NotificationsTemplate {
+                    username: user.username,
+                    c,
+                    error: err,
+                    success: String::new(),
+                }
+                .render()
+                .unwrap_or_default(),
+            ));
+        }
+    };
 
     let db = state.db.clone();
     db.call(move |conn| {
@@ -155,9 +151,13 @@ pub async fn save_notifications(
         };
 
         set_toggle("discord_enabled", &form.discord_enabled)?;
-        set("discord_webhook_url", form.discord_webhook_url.as_deref().unwrap_or(""))?;
+        set(
+            "discord_webhook_url",
+            form.discord_webhook_url.as_deref().unwrap_or(""),
+        )?;
         set_toggle("email_enabled", &form.email_enabled)?;
         set("email_to", &cleaned_emails)?;
+        set("email_to_warnings", &cleaned_warning_emails)?;
         set_toggle("textfile_enabled", &form.textfile_enabled)?;
         set("textfile_path", form.textfile_path.as_deref().unwrap_or(""))?;
         Ok(())
@@ -178,19 +178,4 @@ pub async fn save_notifications(
         .render()
         .unwrap_or_default(),
     ))
-}
-
-async fn load_config(state: &AppState) -> Result<HashMap<String, String>, AppError> {
-    load_config_from_db(state).await.map_err(|e| e.into())
-}
-
-async fn load_config_from_db(
-    state: &AppState,
-) -> Result<HashMap<String, String>, crate::error::DbError> {
-    let db = state.db.clone();
-    db.call(|conn| {
-        let pairs = crate::db::config::get_all(conn)?;
-        Ok(pairs.into_iter().collect())
-    })
-    .await
 }

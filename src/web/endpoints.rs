@@ -1,7 +1,11 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use askama::Template;
+use axum::Form;
 use axum::extract::{Path, State};
 use axum::response::{Html, IntoResponse, Redirect};
-use axum::Form;
 use serde::Deserialize;
 
 use crate::auth::AuthUser;
@@ -17,14 +21,21 @@ struct EndpointsTemplate {
     endpoints: Vec<Endpoint>,
 }
 
+#[derive(Template)]
+#[template(path = "fragments/test_result.html")]
+struct TestResultTemplate<'a> {
+    badge_class: &'static str,
+    state_label: &'static str,
+    value: &'a str,
+    message: &'a str,
+}
+
 pub async fn endpoints_page(
     State(state): State<AppState>,
     user: AuthUser,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
-    let endpoints = db
-        .call(|conn| crate::db::endpoints::list_all(conn))
-        .await?;
+    let endpoints = db.call(|conn| crate::db::endpoints::list_all(conn)).await?;
 
     Ok(Html(
         EndpointsTemplate {
@@ -183,11 +194,16 @@ pub async fn test_endpoint(
     let value_display = result.value.as_deref().unwrap_or("-");
     let message_display = result.message.as_deref().unwrap_or("-");
 
-    Html(format!(
-        r#"<div class="test-result">
-            <span class="badge {badge_class}">{state_label}</span>
-            <span class="test-detail"><strong>Value:</strong> {value_display}</span>
-            <span class="test-detail"><strong>Message:</strong> {message_display}</span>
-        </div>"#
-    ))
+    // Potential XSS: checker output can include user-controlled text, and Askama
+    // gives us HTML escaping for this fragment almost for free.
+    Html(
+        TestResultTemplate {
+            badge_class,
+            state_label,
+            value: value_display,
+            message: message_display,
+        }
+        .render()
+        .unwrap_or_default(),
+    )
 }

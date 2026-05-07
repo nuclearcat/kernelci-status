@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 pub mod runner;
 
 use std::time::Duration;
@@ -17,10 +21,7 @@ pub async fn run(state: AppState, mut shutdown_rx: watch::Receiver<bool>) {
             info!("No recent checks found, running immediately");
         }
         d => {
-            info!(
-                "Last check was recent, next check in {}s",
-                d.as_secs()
-            );
+            info!("Last check was recent, next check in {}s", d.as_secs());
             tokio::select! {
                 _ = tokio::time::sleep(d) => {}
                 _ = shutdown_rx.changed() => {
@@ -36,6 +37,7 @@ pub async fn run(state: AppState, mut shutdown_rx: watch::Receiver<bool>) {
     if let Err(e) = runner::run_all_checks(&state).await {
         error!("Check cycle failed: {e}");
     }
+    cleanup_expired_sessions(&state).await;
     crate::web::incidents::check_escalations(&state).await;
     crate::web::maintenance::check_maintenance_reminders(&state).await;
 
@@ -52,6 +54,7 @@ pub async fn run(state: AppState, mut shutdown_rx: watch::Receiver<bool>) {
                 if let Err(e) = runner::run_all_checks(&state).await {
                     error!("Check cycle failed: {e}");
                 }
+                cleanup_expired_sessions(&state).await;
                 crate::web::incidents::check_escalations(&state).await;
                 crate::web::maintenance::check_maintenance_reminders(&state).await;
             }
@@ -63,13 +66,25 @@ pub async fn run(state: AppState, mut shutdown_rx: watch::Receiver<bool>) {
     }
 }
 
+async fn cleanup_expired_sessions(state: &AppState) {
+    let db = state.db.clone();
+    match db
+        .call(|conn| crate::db::sessions::delete_expired(conn))
+        .await
+    {
+        Ok(deleted) if deleted > 0 => info!("Cleaned up {deleted} expired sessions"),
+        Ok(_) => {}
+        Err(e) => error!("Failed to clean up expired sessions: {e}"),
+    }
+}
+
 /// Read check interval from config cache. Falls back to DEFAULT_INTERVAL_MINS.
 async fn get_interval_mins(state: &AppState) -> u64 {
     let cache = state.config_cache.read().await;
     cache
         .get("check_interval")
         .and_then(|v| v.parse::<u64>().ok())
-        .filter(|&v| v >= 1 && v <= 1440)
+        .filter(|&v| (1..=1440).contains(&v))
         .unwrap_or(DEFAULT_INTERVAL_MINS)
 }
 

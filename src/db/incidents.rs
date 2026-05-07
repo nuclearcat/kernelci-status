@@ -1,4 +1,8 @@
-use rusqlite::{params, Connection, OptionalExtension};
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -60,8 +64,7 @@ fn row_to_incident(row: &rusqlite::Row) -> rusqlite::Result<Incident> {
     })
 }
 
-const INCIDENT_COLS: &str =
-    "id, endpoint_id, title, severity, status, assigned_user_id, public_message, \
+const INCIDENT_COLS: &str = "id, endpoint_id, title, severity, status, assigned_user_id, public_message, \
      created_at, acknowledged_at, resolved_at, auto_created, postmortem";
 
 pub fn insert(conn: &Connection, new: &NewIncident) -> rusqlite::Result<i64> {
@@ -82,7 +85,10 @@ pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<Incident
 }
 
 /// Find an open (not resolved) incident for this endpoint.
-pub fn get_open_for_endpoint(conn: &Connection, endpoint_id: i64) -> rusqlite::Result<Option<Incident>> {
+pub fn get_open_for_endpoint(
+    conn: &Connection,
+    endpoint_id: i64,
+) -> rusqlite::Result<Option<Incident>> {
     conn.query_row(
         &format!(
             "SELECT {INCIDENT_COLS} FROM incidents \
@@ -253,9 +259,19 @@ pub fn get_unacknowledged_past_threshold(
     let mut stmt = conn.prepare(&format!(
         "SELECT {INCIDENT_COLS} FROM incidents \
          WHERE status = 'detected' \
+         AND escalated_at IS NULL \
          AND created_at < datetime('now', '-' || ?1 || ' minutes') \
          ORDER BY created_at ASC"
     ))?;
     let rows = stmt.query_map(params![minutes], row_to_incident)?;
     rows.collect()
+}
+
+pub fn mark_escalated(conn: &Connection, id: i64) -> rusqlite::Result<bool> {
+    let rows = conn.execute(
+        "UPDATE incidents SET escalated_at = datetime('now') \
+         WHERE id = ?1 AND escalated_at IS NULL",
+        params![id],
+    )?;
+    Ok(rows > 0)
 }

@@ -1,5 +1,10 @@
-use rusqlite::{params, Connection};
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
+use rusqlite::{Connection, params};
 use serde::Serialize;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct HistoryEntry {
@@ -42,6 +47,31 @@ pub fn get_latest_for_endpoint(
     }
 }
 
+/// Return the newest history row for each endpoint in one query.
+///
+/// Uses `ROW_NUMBER()` partitioned by endpoint so callers can avoid doing one
+/// `ORDER BY timestamp DESC LIMIT 1` query per endpoint.
+pub fn get_latest_by_endpoint(conn: &Connection) -> rusqlite::Result<HashMap<i64, HistoryEntry>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, endpoint_id, timestamp, value, state, message
+         FROM (
+             SELECT id, endpoint_id, timestamp, value, state, message,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY endpoint_id
+                        ORDER BY timestamp DESC, id DESC
+                    ) AS row_num
+             FROM state_history
+         )
+         WHERE row_num = 1",
+    )?;
+    let rows = stmt.query_map([], map_row)?;
+    let entries = rows.collect::<Result<Vec<_>, _>>()?;
+    Ok(entries
+        .into_iter()
+        .map(|entry| (entry.endpoint_id, entry))
+        .collect())
+}
+
 pub fn get_for_endpoint(
     conn: &Connection,
     endpoint_id: i64,
@@ -81,7 +111,8 @@ pub fn get_all(
     param_values.push(Box::new(limit));
     param_values.push(Box::new(offset));
 
-    let params: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
+    let params: Vec<&dyn rusqlite::types::ToSql> =
+        param_values.iter().map(|p| p.as_ref()).collect();
     let mut stmt = conn.prepare(&sql)?;
     let rows = stmt.query_map(params.as_slice(), map_row)?;
     rows.collect()
@@ -200,38 +231,48 @@ pub fn count_all(
         param_values.push(Box::new(st.to_string()));
     }
 
-    let params: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
+    let params: Vec<&dyn rusqlite::types::ToSql> =
+        param_values.iter().map(|p| p.as_ref()).collect();
     conn.query_row(&sql, params.as_slice(), |row| row.get(0))
 }
 
 /// Get the timestamp of the most recent check across all endpoints.
 pub fn get_last_check_timestamp(conn: &Connection) -> rusqlite::Result<Option<String>> {
-    let mut stmt = conn.prepare(
-        "SELECT timestamp FROM state_history ORDER BY timestamp DESC LIMIT 1",
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT timestamp FROM state_history ORDER BY timestamp DESC LIMIT 1")?;
     let mut rows = stmt.query_map([], |row| row.get(0))?;
     match rows.next() {
         Some(row) => Ok(Some(row?)),
         None => Ok(None),
     }
 }
-/// Get all history entries for an endpoint since a given timestamp.
+/// Get all history entries since a given timestamp, grouped by endpoint.
+///
+/// Loads the range once and groups it in memory, which avoids issuing the same
+/// range query separately for every endpoint on the status page.
 /// The caller supplies the exact cutoff so that the DB query and the
 /// slot-mapping logic share the same time reference (prevents stale
 /// NO_DATA slots during HTMX refreshes).
-pub fn get_since(
+pub fn get_since_by_endpoint(
     conn: &Connection,
-    endpoint_id: i64,
     since: &str,
-) -> rusqlite::Result<Vec<HistoryEntry>> {
+) -> rusqlite::Result<HashMap<i64, Vec<HistoryEntry>>> {
     let mut stmt = conn.prepare(
         "SELECT id, endpoint_id, timestamp, value, state, message
          FROM state_history
-         WHERE endpoint_id = ?1 AND timestamp >= ?2
-         ORDER BY timestamp ASC",
+         WHERE timestamp >= ?1
+         ORDER BY endpoint_id, timestamp ASC",
     )?;
-    let rows = stmt.query_map(params![endpoint_id, since], map_row)?;
-    rows.collect()
+    let rows = stmt.query_map(params![since], map_row)?;
+    let entries = rows.collect::<Result<Vec<_>, _>>()?;
+    let mut by_endpoint: HashMap<i64, Vec<HistoryEntry>> = HashMap::new();
+    for entry in entries {
+        by_endpoint
+            .entry(entry.endpoint_id)
+            .or_default()
+            .push(entry);
+    }
+    Ok(by_endpoint)
 }
 
 /// A resolved outage period extracted from state_history transitions.

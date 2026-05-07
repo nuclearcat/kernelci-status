@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use askama::Template;
 use axum::response::{Html, IntoResponse};
 
@@ -10,5 +14,11 @@ struct HelpTemplate {
 }
 
 pub async fn help_page(user: AuthUser) -> impl IntoResponse {
-    Html(HelpTemplate { username: user.username }.render().unwrap_or_default())
+    Html(
+        HelpTemplate {
+            username: user.username,
+        }
+        .render()
+        .unwrap_or_default(),
+    )
 }

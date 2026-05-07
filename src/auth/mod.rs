@@ -1,11 +1,21 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 pub mod password;
 
 use axum::extract::FromRequestParts;
-use axum::http::request::Parts;
 use axum::http::StatusCode;
+use axum::http::request::Parts;
 use axum::response::{IntoResponse, Redirect, Response};
+use subtle::ConstantTimeEq;
 
 use crate::state::AppState;
+
+// Compare API tokens in constant time to avoid leaking token prefix matches through timing.
+fn api_token_matches(stored: Option<String>, candidate: &str) -> bool {
+    stored.is_some_and(|stored| stored.as_bytes().ct_eq(candidate.as_bytes()).into())
+}
 
 /// Authenticated user extracted from session cookie.
 pub struct AuthUser {
@@ -46,9 +56,8 @@ impl FromRequestParts<AppState> for AuthUser {
                     let db = state.db.clone();
                     let valid: bool = db
                         .call(move |conn| -> rusqlite::Result<bool> {
-                            let stored =
-                                crate::db::config::get(conn, "api_token")?;
-                            Ok(stored.is_some_and(|t| t == api_token))
+                            let stored = crate::db::config::get(conn, "api_token")?;
+                            Ok(api_token_matches(stored, &api_token))
                         })
                         .await
                         .unwrap_or(false);
@@ -138,7 +147,7 @@ impl FromRequestParts<AppState> for ApiAuth {
             let valid: bool = db
                 .call(move |conn| -> rusqlite::Result<bool> {
                     let stored = crate::db::config::get(conn, "api_token")?;
-                    Ok(stored.is_some_and(|t| t == api_token))
+                    Ok(api_token_matches(stored, &api_token))
                 })
                 .await
                 .unwrap_or(false);

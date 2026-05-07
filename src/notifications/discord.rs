@@ -1,6 +1,14 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use serde_json::json;
 
-pub async fn send(client: &reqwest::Client, webhook_url: &str, message: &str) -> Result<(), String> {
+pub async fn send(
+    client: &reqwest::Client,
+    webhook_url: &str,
+    message: &str,
+) -> Result<(), String> {
     let body = json!({
         "embeds": [{
             "description": message,

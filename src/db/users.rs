@@ -1,7 +1,10 @@
-use rusqlite::{params, Connection, OptionalExtension};
-use serde::Serialize;
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
 
-#[derive(Debug, Clone, Serialize)]
+use rusqlite::{Connection, OptionalExtension, params};
+
+#[derive(Debug, Clone)]
 pub struct User {
     pub id: i64,
     pub username: String,
@@ -45,8 +48,9 @@ pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<User>> {
 }
 
 pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<User>> {
-    let mut stmt =
-        conn.prepare("SELECT id, username, password_hash, created_at, email FROM users ORDER BY username")?;
+    let mut stmt = conn.prepare(
+        "SELECT id, username, password_hash, created_at, email FROM users ORDER BY username",
+    )?;
     let rows = stmt.query_map([], |row| {
         Ok(User {
             id: row.get(0)?,

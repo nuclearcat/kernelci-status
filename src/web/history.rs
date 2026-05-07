@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: LGPL-2.1-only
+// SPDX-FileCopyrightText: 2026 Collabora Ltd.
+// Author: Denys Fedoryshchenko <denys.f@collabora.com>
+
 use askama::Template;
 use axum::extract::{Query, State};
 use axum::http::HeaderMap;
@@ -73,11 +77,8 @@ pub async fn history_page(
                 endpoint_filter,
                 sf.as_deref(),
             )?;
-            let total = crate::db::history::count_all(
-                conn,
-                endpoint_filter,
-                state_filter.as_deref(),
-            )?;
+            let total =
+                crate::db::history::count_all(conn, endpoint_filter, state_filter.as_deref())?;
             let endpoints = crate::db::endpoints::list_all(conn)?;
             Ok((entries, total, endpoints))
         })
@@ -175,7 +176,9 @@ pub async fn export_old(
         .await?;
 
     if total == 0 {
-        return Ok(Html("No entries older than 2 months to export.".to_string()));
+        return Ok(Html(
+            "No entries older than 2 months to export.".to_string(),
+        ));
     }
 
     let filename = format!(
