@@ -120,24 +120,51 @@ pub fn get_all(
 
 /// Get the value recorded approximately `hours_ago` hours ago for a given endpoint.
 /// Uses a ±30 minute tolerance window.
-pub fn get_value_hours_ago(
+#[derive(Debug, Clone, Copy)]
+pub struct WindowStats {
+    pub oldest: f64,
+    pub min: f64,
+    pub max: f64,
+}
+
+/// Scan every numeric sample for `endpoint_id` in the last `hours_ago` hours and
+/// return summary stats. Returns `None` when the window contains no parseable
+/// numeric samples (so the caller can short-circuit to NoData).
+///
+/// Robust against data gaps: a missing window edge no longer corrupts the diff,
+/// because we don't depend on any single sample being present at an exact time.
+pub fn get_window_stats(
     conn: &Connection,
     endpoint_id: i64,
     hours_ago: f64,
-) -> rusqlite::Result<Option<String>> {
+) -> rusqlite::Result<Option<WindowStats>> {
+    let since = format!("-{} minutes", (hours_ago * 60.0) as i64);
     let mut stmt = conn.prepare(
-        "SELECT value FROM state_history
-         WHERE endpoint_id = ?1
-           AND timestamp BETWEEN datetime('now', ?2)
-                              AND datetime('now', ?3)
-         ORDER BY timestamp DESC LIMIT 1",
+        "SELECT
+             (SELECT CAST(value AS REAL) FROM state_history
+                WHERE endpoint_id = ?1 AND value IS NOT NULL
+                  AND timestamp >= datetime('now', ?2)
+                ORDER BY timestamp ASC LIMIT 1) AS oldest,
+             MIN(CAST(value AS REAL)) AS min_v,
+             MAX(CAST(value AS REAL)) AS max_v,
+             COUNT(*) AS n
+         FROM state_history
+         WHERE endpoint_id = ?1 AND value IS NOT NULL
+           AND timestamp >= datetime('now', ?2)",
     )?;
-    let lower = format!("-{} minutes", (hours_ago * 60.0 + 30.0) as i64);
-    let upper = format!("-{} minutes", ((hours_ago * 60.0 - 30.0).max(0.0)) as i64);
-    let mut rows = stmt.query_map(params![endpoint_id, lower, upper], |row| row.get(0))?;
-    match rows.next() {
-        Some(row) => Ok(Some(row?)),
-        None => Ok(None),
+    let row = stmt.query_row(params![endpoint_id, since], |row| {
+        Ok((
+            row.get::<_, Option<f64>>(0)?,
+            row.get::<_, Option<f64>>(1)?,
+            row.get::<_, Option<f64>>(2)?,
+            row.get::<_, i64>(3)?,
+        ))
+    })?;
+    match row {
+        (Some(oldest), Some(min), Some(max), n) if n > 0 => {
+            Ok(Some(WindowStats { oldest, min, max }))
+        }
+        _ => Ok(None),
     }
 }
 
