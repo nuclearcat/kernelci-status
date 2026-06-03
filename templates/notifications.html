@@ -52,6 +52,25 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
     </article>
 
     <article>
+        <header><h3>Telegram</h3></header>
+        <label>
+            <input type="checkbox" name="telegram_enabled" {% if c.telegram_enabled %}checked{% endif %}>
+            Enable Telegram notifications
+        </label>
+        <label>
+            Bot Token
+            <input type="password" name="telegram_bot_token" autocomplete="off"
+                   placeholder="{% if c.telegram_bot_token.is_empty() %}Not set{% else %}••••••••{% endif %}">
+            <small>Token from <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a>. Leave blank to keep the current token.</small>
+        </label>
+        <label>
+            Chat ID
+            <input type="text" name="telegram_chat_id" value="{{ c.telegram_chat_id }}" placeholder="-1001234567890 or @channelname">
+            <small>Numeric chat/group/channel id, or <code>@channelname</code> for public channels. Add the bot to the chat first.</small>
+        </label>
+    </article>
+
+    <article>
         <header><h3>Text File</h3></header>
         <label>
             <input type="checkbox" name="textfile_enabled" {% if c.textfile_enabled %}checked{% endif %}>

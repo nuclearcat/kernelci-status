@@ -19,7 +19,7 @@ and maintenance windows.
 - Health checks for HTTP, TLS certificates, Prometheus metrics, PostgreSQL,
   Kubernetes, and Docker-over-SSH
 - SQLite storage with automatic schema migration
-- Email, Discord webhook, and text-file notification backends
+- Email, Discord webhook, Telegram bot, and text-file notification backends
 - Optional ACME/Let's Encrypt TLS support
 - Debian package build script
 

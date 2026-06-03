@@ -17,6 +17,9 @@ use crate::web::common::{is_valid_email, load_config, load_config_from_db};
 pub struct NotifConfig {
     pub discord_enabled: bool,
     pub discord_webhook_url: String,
+    pub telegram_enabled: bool,
+    pub telegram_bot_token: String,
+    pub telegram_chat_id: String,
     pub email_enabled: bool,
     pub email_to: String,
     pub email_to_warnings: String,
@@ -31,6 +34,9 @@ impl NotifConfig {
         Self {
             discord_enabled: m.get("discord_enabled").is_some_and(|v| v == "true"),
             discord_webhook_url: g("discord_webhook_url", ""),
+            telegram_enabled: m.get("telegram_enabled").is_some_and(|v| v == "true"),
+            telegram_bot_token: g("telegram_bot_token", ""),
+            telegram_chat_id: g("telegram_chat_id", ""),
             email_enabled: m.get("email_enabled").is_some_and(|v| v == "true"),
             email_to: g("email_to", ""),
             email_to_warnings: g("email_to_warnings", ""),
@@ -71,6 +77,9 @@ pub async fn notifications_page(
 pub struct NotificationForm {
     pub discord_enabled: Option<String>,
     pub discord_webhook_url: Option<String>,
+    pub telegram_enabled: Option<String>,
+    pub telegram_bot_token: Option<String>,
+    pub telegram_chat_id: Option<String>,
     pub email_enabled: Option<String>,
     pub email_to: Option<String>,
     pub email_to_warnings: Option<String>,
@@ -154,6 +163,17 @@ pub async fn save_notifications(
         set(
             "discord_webhook_url",
             form.discord_webhook_url.as_deref().unwrap_or(""),
+        )?;
+        set_toggle("telegram_enabled", &form.telegram_enabled)?;
+        // Only update the bot token if a new one was submitted (field is never
+        // pre-filled, mirroring the SMTP password handling).
+        let new_token = form.telegram_bot_token.as_deref().unwrap_or("").trim();
+        if !new_token.is_empty() {
+            set("telegram_bot_token", new_token)?;
+        }
+        set(
+            "telegram_chat_id",
+            form.telegram_chat_id.as_deref().unwrap_or("").trim(),
         )?;
         set_toggle("email_enabled", &form.email_enabled)?;
         set("email_to", &cleaned_emails)?;

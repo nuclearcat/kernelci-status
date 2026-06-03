@@ -4,6 +4,7 @@
 
 pub mod discord;
 pub mod email;
+pub mod telegram;
 pub mod textfile;
 
 use std::collections::HashMap;
@@ -68,6 +69,20 @@ pub async fn notification_worker(
                 tasks.push(tokio::spawn(async move {
                     if let Err(e) = discord::send(&client, &url, &msg).await {
                         error!("Discord notification failed: {e}");
+                    }
+                }));
+            }
+        }
+
+        if config.get("telegram_enabled").is_some_and(|v| v == "true") {
+            let token = config.get("telegram_bot_token").cloned().unwrap_or_default();
+            let chat_id = config.get("telegram_chat_id").cloned().unwrap_or_default();
+            if !token.is_empty() && !chat_id.is_empty() {
+                let client = http_client.clone();
+                let msg = text.clone();
+                tasks.push(tokio::spawn(async move {
+                    if let Err(e) = telegram::send(&client, &token, &chat_id, &msg).await {
+                        error!("Telegram notification failed: {e}");
                     }
                 }));
             }
