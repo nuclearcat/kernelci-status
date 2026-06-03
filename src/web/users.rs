@@ -8,7 +8,7 @@ use axum::extract::{Path, State};
 use axum::response::{Html, IntoResponse, Redirect};
 use serde::Deserialize;
 
-use crate::auth::AuthUser;
+use crate::auth::AdminUser;
 use crate::db::users::User;
 use crate::error::AppError;
 use crate::state::AppState;
@@ -22,7 +22,7 @@ struct UsersTemplate {
 
 pub async fn users_page(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
     let users = db.call(|conn| crate::db::users::list_all(conn)).await?;
@@ -41,20 +41,77 @@ pub async fn users_page(
 pub struct AddUserForm {
     pub username: String,
     pub password: String,
+    #[serde(default)]
+    pub role: Option<String>,
 }
 
 pub async fn add_user(
     State(state): State<AppState>,
-    _user: AuthUser,
+    _user: AdminUser,
     Form(form): Form<AddUserForm>,
 ) -> Result<impl IntoResponse, AppError> {
+    // Default to the least-privileged role if the form omits/garbles it.
+    let role = match form.role.as_deref() {
+        Some(r) if crate::db::users::valid_role(r) => r.to_string(),
+        _ => "maintainer".to_string(),
+    };
+
     let hash = crate::auth::password::hash_password(&form.password)
         .map_err(|e| AppError::Internal(format!("Password hash error: {e}")))?;
 
     let username = form.username;
     let db = state.db.clone();
     db.call(move |conn| {
-        crate::db::users::insert(conn, &username, &hash)?;
+        crate::db::users::insert(conn, &username, &hash, &role)?;
+        Ok(())
+    })
+    .await?;
+
+    Ok(Redirect::to("/admin/users"))
+}
+
+#[derive(Deserialize)]
+pub struct UpdateRoleForm {
+    pub role: String,
+}
+
+pub async fn update_role(
+    State(state): State<AppState>,
+    auth: AdminUser,
+    Path(id): Path<i64>,
+    Form(form): Form<UpdateRoleForm>,
+) -> Result<impl IntoResponse, AppError> {
+    if auth.user_id == id {
+        return Err(AppError::BadRequest(
+            "Cannot change your own role".to_string(),
+        ));
+    }
+    if !crate::db::users::valid_role(&form.role) {
+        return Err(AppError::BadRequest("Invalid role".to_string()));
+    }
+
+    let db = state.db.clone();
+    let (target_role, admin_count) = db
+        .call(move |conn| {
+            let role = crate::db::users::get_by_id(conn, id)?
+                .map(|u| u.role)
+                .unwrap_or_default();
+            let count = crate::db::users::count_admins(conn)?;
+            Ok::<_, rusqlite::Error>((role, count))
+        })
+        .await?;
+
+    // Don't let the last admin demote themselves out of existence.
+    if target_role == "admin" && form.role != "admin" && admin_count <= 1 {
+        return Err(AppError::BadRequest(
+            "Cannot demote the last admin".to_string(),
+        ));
+    }
+
+    let role = form.role.clone();
+    let db = state.db.clone();
+    db.call(move |conn| {
+        crate::db::users::update_role(conn, id, &role)?;
         Ok(())
     })
     .await?;
@@ -69,7 +126,7 @@ pub struct ChangePasswordForm {
 
 pub async fn change_password(
     State(state): State<AppState>,
-    _user: AuthUser,
+    _user: AdminUser,
     Path(id): Path<i64>,
     Form(form): Form<ChangePasswordForm>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -104,7 +161,7 @@ pub struct UpdateEmailForm {
 
 pub async fn update_email(
     State(state): State<AppState>,
-    _user: AuthUser,
+    _user: AdminUser,
     Path(id): Path<i64>,
     Form(form): Form<UpdateEmailForm>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -120,12 +177,29 @@ pub async fn update_email(
 
 pub async fn delete_user(
     State(state): State<AppState>,
-    auth: AuthUser,
+    auth: AdminUser,
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
     if auth.user_id == id {
         return Err(AppError::BadRequest(
             "Cannot delete your own account".to_string(),
+        ));
+    }
+
+    let db = state.db.clone();
+    let (target_role, admin_count) = db
+        .call(move |conn| {
+            let role = crate::db::users::get_by_id(conn, id)?
+                .map(|u| u.role)
+                .unwrap_or_default();
+            let count = crate::db::users::count_admins(conn)?;
+            Ok::<_, rusqlite::Error>((role, count))
+        })
+        .await?;
+
+    if target_role == "admin" && admin_count <= 1 {
+        return Err(AppError::BadRequest(
+            "Cannot delete the last admin".to_string(),
         ));
     }
 

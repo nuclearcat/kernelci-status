@@ -23,15 +23,25 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
                 Password
                 <input type="password" name="password" required>
             </label>
+            <label>
+                Role
+                <select name="role">
+                    <option value="maintainer" selected>maintainer</option>
+                    <option value="admin">admin</option>
+                </select>
+            </label>
         </div>
         <button type="submit">Add User</button>
     </form>
+    <p><small><strong>admin</strong>: full access. <strong>maintainer</strong>: may only
+    manage maintenance windows for endpoints in their <a href="/admin/teams">teams</a>.</small></p>
 </details>
 
 <table role="grid">
     <thead>
         <tr>
             <th>Username</th>
+            <th>Role</th>
             <th>Email</th>
             <th>Created</th>
             <th>Actions</th>
@@ -41,6 +51,15 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
         {% for u in users %}
         <tr>
             <td>{{ u.username }}</td>
+            <td>
+                <form method="post" action="/admin/users/role/{{ u.id }}" class="inline-form">
+                    <select name="role" class="input-sm" onchange="this.form.requestSubmit()">
+                        <option value="admin" {% if u.role == "admin" %}selected{% endif %}>admin</option>
+                        <option value="maintainer" {% if u.role == "maintainer" %}selected{% endif %}>maintainer</option>
+                    </select>
+                    <noscript><button type="submit" class="btn-sm">Set</button></noscript>
+                </form>
+            </td>
             <td>{{ u.email.as_deref().unwrap_or("—") }}</td>
             <td>{{ u.created_at }}</td>
             <td>

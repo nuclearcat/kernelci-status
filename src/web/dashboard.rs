@@ -7,7 +7,7 @@ use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::{Html, IntoResponse};
 
-use crate::auth::AuthUser;
+use crate::auth::AdminUser;
 use crate::db::endpoints::{Endpoint, EndpointWithState};
 use crate::db::history::HistoryEntry;
 use crate::error::AppError;
@@ -32,7 +32,7 @@ struct EndpointRowsTemplate {
 
 pub async fn dashboard(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
@@ -95,7 +95,7 @@ struct EndpointDetailTemplate {
 
 pub async fn endpoint_detail(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();

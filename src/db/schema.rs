@@ -78,7 +78,51 @@ pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
     migrate_maintenance_reminder(conn)?;
     migrate_nodata_behavior(conn)?;
     migrate_deploy_changelog(conn)?;
+    migrate_user_roles(conn)?;
+    migrate_teams(conn)?;
 
+    Ok(())
+}
+
+/// Add a `role` column to users (admin | maintainer). Existing users default to
+/// 'admin' so behaviour is unchanged on upgrade.
+fn migrate_user_roles(conn: &Connection) -> rusqlite::Result<()> {
+    let has_role = {
+        let mut stmt = conn.prepare("PRAGMA table_info(users)")?;
+        let names: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?;
+        names.iter().any(|n| n == "role")
+    };
+    if !has_role {
+        conn.execute_batch("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'")?;
+    }
+    Ok(())
+}
+
+/// Create the teams tables used for maintenance endpoint scoping. A maintainer's
+/// allowed endpoints = union of `team_endpoints` across the teams they belong to.
+/// `team_endpoints` stores the endpoint *name* (the unit the maintenance picker
+/// uses); there is no FK to endpoints because name is not a unique key.
+fn migrate_teams(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS teams (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE
+        );
+        CREATE TABLE IF NOT EXISTS team_members (
+            team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            PRIMARY KEY (team_id, user_id)
+        );
+        CREATE TABLE IF NOT EXISTS team_endpoints (
+            team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+            endpoint_name TEXT NOT NULL,
+            PRIMARY KEY (team_id, endpoint_name)
+        );
+        ",
+    )?;
     Ok(())
 }
 
@@ -540,5 +584,78 @@ mod tests {
 
         // Running migration again should be a no-op (column already exists)
         super::migrate_add_check_type(&conn).unwrap();
+    }
+
+    /// Old users table (no `role`) gets the column with existing rows defaulting
+    /// to 'admin', and the migration is idempotent.
+    #[test]
+    fn test_migrate_user_roles() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+            );
+            INSERT INTO users (username, password_hash) VALUES ('alice', 'x');
+            ",
+        )
+        .unwrap();
+
+        super::migrate_user_roles(&conn).unwrap();
+        let role: String = conn
+            .query_row("SELECT role FROM users WHERE username = 'alice'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(role, "admin");
+
+        // Idempotent
+        super::migrate_user_roles(&conn).unwrap();
+    }
+
+    /// Teams tables are created and the per-user scope query returns the union of
+    /// endpoint names across the user's teams.
+    #[test]
+    fn test_migrate_teams_and_scope() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON").unwrap();
+        conn.execute_batch(
+            "
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL
+            );
+            INSERT INTO users (id, username, password_hash) VALUES (1, 'bob', 'x');
+            ",
+        )
+        .unwrap();
+
+        super::migrate_teams(&conn).unwrap();
+
+        conn.execute_batch(
+            "
+            INSERT INTO teams (id, name) VALUES (10, 'storage'), (20, 'net');
+            INSERT INTO team_members (team_id, user_id) VALUES (10, 1), (20, 1);
+            INSERT INTO team_endpoints (team_id, endpoint_name) VALUES
+                (10, 'ceph'), (10, 'nfs'), (20, 'router');
+            ",
+        )
+        .unwrap();
+
+        let names = crate::db::teams::allowed_endpoint_names_for_user(&conn, 1).unwrap();
+        let mut sorted: Vec<String> = names.into_iter().collect();
+        sorted.sort();
+        assert_eq!(sorted, vec!["ceph", "nfs", "router"]);
+
+        // Deleting a team cascades its members/endpoints away.
+        crate::db::teams::delete(&conn, 10).unwrap();
+        let names = crate::db::teams::allowed_endpoint_names_for_user(&conn, 1).unwrap();
+        let mut sorted: Vec<String> = names.into_iter().collect();
+        sorted.sort();
+        assert_eq!(sorted, vec!["router"]);
     }
 }

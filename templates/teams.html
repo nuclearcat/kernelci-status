@@ -1,0 +1,80 @@
+{#
+SPDX-License-Identifier: LGPL-2.1-only
+SPDX-FileCopyrightText: 2026 Collabora Ltd.
+Author: Denys Fedoryshchenko <denys.f@collabora.com>
+#}
+{% extends "base.html" %}
+
+{% block username %}{{ username }}{% endblock %}
+{% block title %}Teams — KernelCI Status{% endblock %}
+
+{% block content %}
+<h2>Teams</h2>
+<p>Teams scope what <strong>maintainer</strong> users can do: a maintainer may schedule
+and manage maintenance only for the endpoints belonging to the teams they're a member of.
+Admins are unaffected and can manage everything.</p>
+
+<details>
+    <summary role="button" class="secondary">Create New Team</summary>
+    <form method="post" action="/admin/teams/add">
+        <label>
+            Team name
+            <input type="text" name="name" required placeholder="storage">
+        </label>
+        <button type="submit">Create Team</button>
+    </form>
+</details>
+
+{% if teams.is_empty() %}
+<p>No teams defined yet.</p>
+{% endif %}
+
+{% for team in teams %}
+<article>
+    <header>
+        <div class="action-group" style="justify-content:space-between;align-items:center">
+            <strong>{{ team.name }}</strong>
+            <form method="post" action="/admin/teams/delete/{{ team.id }}" style="margin:0">
+                <button type="submit" class="btn-sm outline secondary"
+                    onclick="return confirm('Delete team {{ team.name }}? Its members lose this scope.')">Delete team</button>
+            </form>
+        </div>
+    </header>
+
+    <form method="post" action="/admin/teams/{{ team.id }}/members">
+        <fieldset>
+            <legend>Members</legend>
+            <div class="checkbox-grid">
+                {% for u in all_users %}
+                <label>
+                    <input type="checkbox" name="user_ids" value="{{ u.id }}"
+                        {% if team.member_ids.contains(u.id) %}checked{% endif %}>
+                    {{ u.username }} <small>({{ u.role }})</small>
+                </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+        <button type="submit" class="btn-sm">Save members</button>
+    </form>
+
+    <form method="post" action="/admin/teams/{{ team.id }}/endpoints">
+        <fieldset>
+            <legend>Endpoints</legend>
+            {% if all_endpoint_names.is_empty() %}
+            <small>No endpoints defined yet.</small>
+            {% endif %}
+            <div class="checkbox-grid">
+                {% for name in all_endpoint_names %}
+                <label>
+                    <input type="checkbox" name="endpoint_names" value="{{ name }}"
+                        {% if team.endpoint_names.contains(name) %}checked{% endif %}>
+                    {{ name }}
+                </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+        <button type="submit" class="btn-sm">Save endpoints</button>
+    </form>
+</article>
+{% endfor %}
+{% endblock %}

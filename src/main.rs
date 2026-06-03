@@ -54,8 +54,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let conn = db::open_and_migrate(&cfg.db_path).await?;
 
     // Handle create-user subcommand
-    if let Some(Commands::CreateUser { username }) = &cfg.command {
+    if let Some(Commands::CreateUser {
+        username,
+        maintainer,
+    }) = &cfg.command
+    {
         let username = username.clone();
+        let role = if *maintainer { "maintainer" } else { "admin" };
         eprintln!("Enter password for user '{username}': ");
         let mut password = String::new();
         std::io::stdin().read_line(&mut password)?;
@@ -70,7 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map_err(|e| format!("Failed to hash password: {e}"))?;
 
         conn.call(move |conn| -> rusqlite::Result<()> {
-            db::users::insert(conn, &username, &hash)?;
+            db::users::insert(conn, &username, &hash, role)?;
             Ok(())
         })
         .await?;
@@ -93,7 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|e| format!("Failed to hash password: {e}"))?;
             let u = username.clone();
             conn.call(move |conn| -> rusqlite::Result<()> {
-                db::users::insert(conn, &u, &hash)?;
+                db::users::insert(conn, &u, &hash, "admin")?;
                 Ok(())
             })
             .await?;

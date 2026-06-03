@@ -7,7 +7,7 @@ use axum::extract::{Path, State};
 use axum::response::{Html, IntoResponse, Redirect};
 use axum_extra::extract::Form;
 use serde::Deserialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 use tracing::error;
 
@@ -15,6 +15,63 @@ use crate::auth::AuthUser;
 use crate::db::maintenance::NewMaintenanceWindow;
 use crate::error::AppError;
 use crate::state::AppState;
+
+/// Maintainers may only manage maintenance for endpoints within their team scope.
+/// Returns `None` for admins (unrestricted), or `Some(allowed endpoint names)`
+/// for a maintainer (the union across their teams — empty if they're on no team).
+async fn scope_for(
+    state: &AppState,
+    user: &AuthUser,
+) -> Result<Option<HashSet<String>>, AppError> {
+    if user.role == "admin" {
+        return Ok(None);
+    }
+    let uid = user.user_id;
+    let db = state.db.clone();
+    let names = db
+        .call(move |conn| crate::db::teams::allowed_endpoint_names_for_user(conn, uid))
+        .await?;
+    Ok(Some(names))
+}
+
+/// Reject if a maintainer submits endpoint names outside their scope, or none.
+fn check_submitted_names(scope: &Option<HashSet<String>>, names: &[String]) -> Result<(), AppError> {
+    if let Some(allowed) = scope {
+        if names.is_empty() {
+            return Err(AppError::BadRequest(
+                "Select at least one endpoint from your team".to_string(),
+            ));
+        }
+        if let Some(bad) = names.iter().find(|n| !allowed.contains(*n)) {
+            return Err(AppError::BadRequest(format!(
+                "Not authorized to schedule maintenance for '{bad}'"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Reject if a maintainer tries to act on an existing window whose endpoints
+/// aren't fully within their scope. No-op for admins.
+async fn check_window_ownership(
+    state: &AppState,
+    scope: &Option<HashSet<String>>,
+    window_id: i64,
+) -> Result<(), AppError> {
+    let Some(allowed) = scope else {
+        return Ok(());
+    };
+    let db = state.db.clone();
+    let names = db
+        .call(move |conn| crate::db::maintenance::get_endpoint_names(conn, window_id))
+        .await?;
+    if names.is_empty() || !names.iter().all(|n| allowed.contains(n)) {
+        return Err(AppError::BadRequest(
+            "Not authorized to manage this maintenance window".to_string(),
+        ));
+    }
+    Ok(())
+}
 
 /// View model for a maintenance window (with resolved endpoint names and truncated times).
 struct WindowView {
@@ -33,6 +90,7 @@ struct WindowView {
 #[template(path = "maintenance.html")]
 struct MaintenanceTemplate {
     username: String,
+    is_admin: bool,
     windows: Vec<WindowView>,
     unique_names: Vec<String>,
     now: String,
@@ -51,16 +109,24 @@ pub async fn maintenance_page(
         })
         .await?;
 
-    // Unique endpoint names (sorted)
+    // Maintainers are restricted to the endpoints in their team scope.
+    let scope = scope_for(&state, &user).await?;
+    let is_admin = scope.is_none();
+
+    // Unique endpoint names (sorted), restricted to scope for maintainers.
     let unique_names: Vec<String> = {
-        let set: BTreeSet<String> = endpoints.iter().map(|e| e.name.clone()).collect();
+        let set: BTreeSet<String> = endpoints
+            .iter()
+            .map(|e| e.name.clone())
+            .filter(|n| scope.as_ref().is_none_or(|allowed| allowed.contains(n)))
+            .collect();
         set.into_iter().collect()
     };
 
     let now_full = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     // Build view models with resolved endpoint names and truncated times
-    let windows: Vec<WindowView> = windows
+    let mut windows: Vec<WindowView> = windows
         .into_iter()
         .map(|w| {
             let names: BTreeSet<String> = w
@@ -84,11 +150,19 @@ pub async fn maintenance_page(
         })
         .collect();
 
+    // Maintainers only see windows whose endpoints are fully within their scope.
+    if let Some(allowed) = &scope {
+        windows.retain(|w| {
+            !w.endpoint_names.is_empty() && w.endpoint_names.iter().all(|n| allowed.contains(n))
+        });
+    }
+
     let now = truncate_seconds(&now_full);
 
     Ok(Html(
         MaintenanceTemplate {
             username: user.username,
+            is_admin,
             windows,
             unique_names,
             now,
@@ -151,9 +225,11 @@ fn validate_not_in_past(form: &MaintenanceForm) -> Result<(), AppError> {
 
 pub async fn add_maintenance(
     State(state): State<AppState>,
-    _user: AuthUser,
+    user: AuthUser,
     Form(form): Form<MaintenanceForm>,
 ) -> Result<impl IntoResponse, AppError> {
+    let scope = scope_for(&state, &user).await?;
+    check_submitted_names(&scope, &form.endpoint_names)?;
     validate_not_in_past(&form)?;
     let start = normalize_time(&form.start_time);
     let end = normalize_time(&form.end_time);
@@ -185,10 +261,14 @@ pub async fn add_maintenance(
 
 pub async fn edit_maintenance(
     State(state): State<AppState>,
-    _user: AuthUser,
+    user: AuthUser,
     Path(id): Path<i64>,
     Form(form): Form<MaintenanceForm>,
 ) -> Result<impl IntoResponse, AppError> {
+    let scope = scope_for(&state, &user).await?;
+    // Must own the window as it stands AND only target endpoints within scope.
+    check_window_ownership(&state, &scope, id).await?;
+    check_submitted_names(&scope, &form.endpoint_names)?;
     validate_not_in_past(&form)?;
     let start = normalize_time(&form.start_time);
     let end = normalize_time(&form.end_time);
@@ -220,9 +300,11 @@ pub async fn edit_maintenance(
 
 pub async fn delete_maintenance(
     State(state): State<AppState>,
-    _user: AuthUser,
+    user: AuthUser,
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
+    let scope = scope_for(&state, &user).await?;
+    check_window_ownership(&state, &scope, id).await?;
     let db = state.db.clone();
     db.call(move |conn| crate::db::maintenance::delete(conn, id))
         .await?;
@@ -231,9 +313,11 @@ pub async fn delete_maintenance(
 
 pub async fn close_maintenance(
     State(state): State<AppState>,
-    _user: AuthUser,
+    user: AuthUser,
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
+    let scope = scope_for(&state, &user).await?;
+    check_window_ownership(&state, &scope, id).await?;
     let ended_at = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let db = state.db.clone();
     let closed = db

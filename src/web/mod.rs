@@ -14,6 +14,7 @@ pub mod maintenance;
 pub mod notifications;
 pub mod reports;
 pub mod status;
+pub mod teams;
 pub mod users;
 
 use axum::Router;
@@ -174,6 +175,10 @@ pub fn router(state: AppState) -> Router {
         .route("/admin/users", axum::routing::get(users::users_page))
         .route("/admin/users/add", axum::routing::post(users::add_user))
         .route(
+            "/admin/users/role/{id}",
+            axum::routing::post(users::update_role),
+        )
+        .route(
             "/admin/users/password/{id}",
             axum::routing::post(users::change_password),
         )
@@ -184,6 +189,20 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/admin/users/delete/{id}",
             axum::routing::post(users::delete_user),
+        )
+        .route("/admin/teams", axum::routing::get(teams::teams_page))
+        .route("/admin/teams/add", axum::routing::post(teams::add_team))
+        .route(
+            "/admin/teams/delete/{id}",
+            axum::routing::post(teams::delete_team),
+        )
+        .route(
+            "/admin/teams/{id}/members",
+            axum::routing::post(teams::update_members),
+        )
+        .route(
+            "/admin/teams/{id}/endpoints",
+            axum::routing::post(teams::update_endpoints),
         )
         .route(
             "/admin/history",

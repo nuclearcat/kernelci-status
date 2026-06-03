@@ -9,7 +9,7 @@ use axum::response::{Html, IntoResponse};
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::auth::AuthUser;
+use crate::auth::AdminUser;
 use crate::error::AppError;
 use crate::state::AppState;
 use crate::web::common::{is_valid_email, load_config, load_config_from_db};
@@ -57,7 +57,7 @@ struct NotificationsTemplate {
 
 pub async fn notifications_page(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
 ) -> Result<impl IntoResponse, AppError> {
     let config = load_config(&state).await?;
 
@@ -114,7 +114,7 @@ fn validate_emails(raw: &str) -> Result<String, String> {
 
 pub async fn save_notifications(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
     Form(form): Form<NotificationForm>,
 ) -> Result<impl IntoResponse, AppError> {
     let email_to_raw = form.email_to.clone().unwrap_or_default();

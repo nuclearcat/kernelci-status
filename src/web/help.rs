@@ -5,7 +5,7 @@
 use askama::Template;
 use axum::response::{Html, IntoResponse};
 
-use crate::auth::AuthUser;
+use crate::auth::AdminUser;
 
 #[derive(Template)]
 #[template(path = "help.html")]
@@ -13,7 +13,7 @@ struct HelpTemplate {
     username: String,
 }
 
-pub async fn help_page(user: AuthUser) -> impl IntoResponse {
+pub async fn help_page(user: AdminUser) -> impl IntoResponse {
     Html(
         HelpTemplate {
             username: user.username,

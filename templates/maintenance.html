@@ -7,6 +7,23 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
 {% block title %}Maintenance Windows{% endblock %}
 {% block username %}{{ username }}{% endblock %}
 
+{# Maintainers see only Status + Maintenance; admins get the full nav.
+   Keep this list in sync with base.html's adminnav block. #}
+{% block adminnav %}
+{% if is_admin %}
+<li><a href="/admin">Dashboard</a></li>
+<li><a href="/admin/endpoints">Endpoints</a></li>
+<li><a href="/admin/incidents">Incidents</a></li>
+<li><a href="/admin/notifications">Notifications</a></li>
+<li><a href="/admin/configuration">Configuration</a></li>
+<li><a href="/admin/users">Users</a></li>
+<li><a href="/admin/teams">Teams</a></li>
+<li><a href="/admin/reports">Reports</a></li>
+<li><a href="/admin/history">History</a></li>
+<li><a href="/admin/help">Help</a></li>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <h2>Maintenance Windows</h2>
 <p>Schedule maintenance windows to mark endpoints as under planned maintenance. Checks still run during maintenance — the actual health state is recorded alongside the maintenance indicator.</p>

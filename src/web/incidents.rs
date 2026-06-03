@@ -8,7 +8,7 @@ use axum::extract::{Path, State};
 use axum::response::{Html, IntoResponse, Redirect};
 use serde::Deserialize;
 
-use crate::auth::AuthUser;
+use crate::auth::AdminUser;
 use crate::db::endpoints::Endpoint;
 use crate::db::incidents::{Incident, IncidentUpdate};
 use crate::db::users::User;
@@ -50,7 +50,7 @@ pub struct IncidentRow {
 
 pub async fn incidents_page(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
     let (incidents, endpoints) = db
@@ -116,7 +116,7 @@ pub struct UpdateRow {
 
 pub async fn incident_detail(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
@@ -192,7 +192,7 @@ pub struct CreateIncidentForm {
 
 pub async fn create_incident(
     State(state): State<AppState>,
-    _user: AuthUser,
+    _user: AdminUser,
     Form(form): Form<CreateIncidentForm>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
@@ -233,7 +233,7 @@ pub struct UpdateStatusForm {
 
 pub async fn update_incident_status(
     State(state): State<AppState>,
-    auth: AuthUser,
+    auth: AdminUser,
     Path(id): Path<i64>,
     Form(form): Form<UpdateStatusForm>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -265,7 +265,7 @@ pub struct CommentForm {
 
 pub async fn add_comment(
     State(state): State<AppState>,
-    auth: AuthUser,
+    auth: AdminUser,
     Path(id): Path<i64>,
     Form(form): Form<CommentForm>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -299,7 +299,7 @@ pub struct PublicMessageForm {
 
 pub async fn update_public_message(
     State(state): State<AppState>,
-    _user: AuthUser,
+    _user: AdminUser,
     Path(id): Path<i64>,
     Form(form): Form<PublicMessageForm>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -322,7 +322,7 @@ pub struct HandoverForm {
 
 pub async fn handover_incident(
     State(state): State<AppState>,
-    auth: AuthUser,
+    auth: AdminUser,
     Path(id): Path<i64>,
     Form(form): Form<HandoverForm>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -439,7 +439,7 @@ pub struct PostmortemForm {
 
 pub async fn save_postmortem(
     State(state): State<AppState>,
-    _user: AuthUser,
+    _user: AdminUser,
     Path(id): Path<i64>,
     Form(form): Form<PostmortemForm>,
 ) -> Result<impl IntoResponse, AppError> {

@@ -10,7 +10,7 @@ use axum::response::{Html, IntoResponse};
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::auth::AuthUser;
+use crate::auth::AdminUser;
 use crate::error::AppError;
 use crate::state::AppState;
 use crate::web::common::{is_valid_email, load_config, load_config_from_db};
@@ -64,7 +64,7 @@ struct ConfigurationTemplate {
 
 pub async fn configuration_page(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
 ) -> Result<impl IntoResponse, AppError> {
     let config = load_config(&state).await?;
 
@@ -99,7 +99,7 @@ pub struct ConfigurationForm {
 
 pub async fn save_configuration(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
     Form(form): Form<ConfigurationForm>,
 ) -> Result<impl IntoResponse, AppError> {
     // Validate scheduler settings
@@ -292,7 +292,7 @@ pub async fn save_configuration(
 
 pub async fn test_email(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
 ) -> Result<impl IntoResponse, AppError> {
     let config = load_config(&state).await?;
     let cfg_view = AppConfigView::from_map(&config);
@@ -365,7 +365,7 @@ pub async fn test_email(
 
 pub async fn download_backup(
     State(state): State<AppState>,
-    _user: AuthUser,
+    _user: AdminUser,
 ) -> Result<impl IntoResponse, AppError> {
     let ts = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
     let tmp_path = std::env::temp_dir().join(format!(
@@ -404,7 +404,7 @@ pub async fn download_backup(
 
 pub async fn restore_backup(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
     mut multipart: Multipart,
 ) -> Result<impl IntoResponse, AppError> {
     let mut uploaded: Option<Vec<u8>> = None;

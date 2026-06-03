@@ -101,7 +101,13 @@ pub async fn login_submit(State(state): State<AppState>, Form(form): Form<LoginF
 
     let cookie = session_cookie(&token, 604800, state.secure_cookies);
 
-    let mut response = Redirect::to("/admin").into_response();
+    // Maintainers can only use the maintenance page; send them straight there.
+    let dest = if user.role == "admin" {
+        "/admin"
+    } else {
+        "/admin/maintenance"
+    };
+    let mut response = Redirect::to(dest).into_response();
     response
         .headers_mut()
         .insert(SET_COOKIE, cookie.parse().unwrap());
