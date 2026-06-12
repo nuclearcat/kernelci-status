@@ -12,6 +12,38 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
     <link rel="stylesheet" href="/static/pico.min.css">
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/htmx.min.js"></script>
+    <script>
+    // Position help tooltips in viewport coordinates so they aren't clipped by
+    // ancestors with overflow: hidden (tables, .admin-section, details).
+    (function () {
+        const MARGIN = 8;
+        const GAP = 8;
+        function position(icon) {
+            const tip = icon.querySelector('.help-tooltip');
+            if (!tip) return;
+            const isDown = tip.classList.contains('help-tooltip-down');
+            const iconR = icon.getBoundingClientRect();
+            const tipR = tip.getBoundingClientRect();
+            const vw = window.innerWidth;
+            let left = iconR.left + iconR.width / 2 - tipR.width / 2;
+            if (left < MARGIN) left = MARGIN;
+            if (left + tipR.width > vw - MARGIN) left = vw - MARGIN - tipR.width;
+            const top = isDown ? iconR.bottom + GAP : iconR.top - tipR.height - GAP;
+            tip.style.left = `${left}px`;
+            tip.style.top = `${top}px`;
+            const arrowX = iconR.left + iconR.width / 2 - left;
+            tip.style.setProperty('--arrow-offset', `${arrowX}px`);
+        }
+        document.addEventListener('mouseenter', e => {
+            const icon = e.target.closest?.('.help-icon');
+            if (icon) position(icon);
+        }, true);
+        document.addEventListener('focusin', e => {
+            const icon = e.target.closest?.('.help-icon');
+            if (icon) position(icon);
+        });
+    })();
+    </script>
 </head>
 <body>
     <nav class="admin-nav container-fluid">

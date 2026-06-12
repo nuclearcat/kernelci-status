@@ -250,11 +250,9 @@ code {
 
 .help-tooltip {
     display: none;
-    position: absolute;
-    bottom: calc(100% + 8px);
-    left: 50%;
-    transform: translateX(-50%);
-    width: 300px;
+    position: fixed;
+    width: max-content;
+    max-width: min(300px, calc(100vw - 24px));
     padding: 0.75rem 0.9rem;
     background: var(--kci-dark);
     color: #e8e8e8;
@@ -263,17 +261,18 @@ code {
     line-height: 1.5;
     border-radius: 6px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-    z-index: 100;
+    z-index: 1000;
     text-align: left;
     white-space: normal;
     cursor: default;
+    --arrow-offset: 50%;
 }
 
 .help-tooltip::after {
     content: "";
     position: absolute;
     top: 100%;
-    left: 50%;
+    left: var(--arrow-offset);
     transform: translateX(-50%);
     border: 6px solid transparent;
     border-top-color: var(--kci-dark);
@@ -292,15 +291,11 @@ code {
     color: #fff;
 }
 
-/* Downward variant for tooltips near the top of the page */
-.help-tooltip-down {
-    bottom: auto;
-    top: calc(100% + 8px);
-}
-
+/* Downward variant — JS positions, but the arrow direction differs. */
 .help-tooltip-down::after {
     top: auto;
     bottom: 100%;
+    left: var(--arrow-offset);
     border-top-color: transparent;
     border-bottom-color: var(--kci-dark);
 }

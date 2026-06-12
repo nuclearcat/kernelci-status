@@ -238,7 +238,12 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
     <header><h3>Kubernetes</h3></header>
     <p>Check type: <code>kubernetes</code>. Endpoint is the namespace name. Selector is the optional label filter.</p>
 
-    <p>Connects via the system kubeconfig. Lists pods and checks their uptime. WARNING if any pod has been running for less than 30 minutes (may indicate crash-looping or recent restarts).</p>
+    <p>Connects via the system kubeconfig. Lists pods and inspects each container's restart count and current state. The measured value is the sum of container restart counts across all matching pods.</p>
+    <ul>
+        <li><b>CRITICAL</b> if any container is in <code>CrashLoopBackOff</code>, <code>ImagePullBackOff</code>, <code>ErrImagePull</code>, <code>CreateContainerError</code>, <code>CreateContainerConfigError</code>, or <code>InvalidImageName</code>.</li>
+        <li><b>WARNING</b> if any container has restarted in the last 30 minutes (based on <code>lastState.terminated.finishedAt</code>).</li>
+        <li>Otherwise the user-supplied <code>condition</code> is evaluated against the total restart count, so growth-based alerts like <code>diff(12h)&gt;5</code> work directly.</li>
+    </ul>
 
     <h4>Examples</h4>
     <table>
@@ -282,6 +287,27 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
         <li>The message lists which pods have low uptime, e.g. <code>api-7f8b9-xk2j4: uptime 3m</code>.</li>
         <li>Uses the system kubeconfig (typically <code>~/.kube/config</code> or in-cluster credentials).</li>
     </ul>
+
+    <h4>Where to put the kubeconfig</h4>
+    <p>The daemon loads credentials via the standard kube-rs lookup, in this order:</p>
+    <ol>
+        <li><code>$KUBECONFIG</code> environment variable, if set.</li>
+        <li><code>$HOME/.kube/config</code>.</li>
+        <li>In-cluster service-account token at <code>/var/run/secrets/kubernetes.io/serviceaccount/</code> (used automatically when running inside a Kubernetes pod).</li>
+    </ol>
+    <p>When installed from the <code>.deb</code> package, the service runs as user <code>kernelci-status</code> with home <code>/var/lib/kernelci-status</code> and systemd hardening (<code>ProtectHome=yes</code>, <code>ProtectSystem=strict</code>). The simplest option is:</p>
+<pre><code>sudo install -d -o kernelci-status -g kernelci-status -m 700 \
+    /var/lib/kernelci-status/.kube
+sudo install -o kernelci-status -g kernelci-status -m 600 \
+    /path/to/your/kubeconfig /var/lib/kernelci-status/.kube/config
+sudo systemctl restart kernelci-status</code></pre>
+    <p><code>ProtectHome=yes</code> only masks <code>/home</code>, <code>/root</code>, and <code>/run/user</code> — it does not affect <code>/var/lib</code>, so <code>$HOME/.kube/config</code> resolves correctly here.</p>
+    <p><b>Alternative — put it under <code>/etc</code>:</b> drop the file at <code>/etc/kernelci-status/kubeconfig</code> (mode <code>0640</code>, group <code>kernelci-status</code>) and edit the systemd unit:</p>
+<pre><code>[Service]
+Environment=KUBECONFIG=/etc/kernelci-status/kubeconfig
+ReadOnlyPaths=/etc/kernelci-status.toml /etc/kernelci-status/kubeconfig</code></pre>
+    <p>Then <code>systemctl daemon-reload &amp;&amp; systemctl restart kernelci-status</code>.</p>
+    <p><b>Gotcha:</b> if the kubeconfig uses an <code>exec:</code> auth plugin (<code>gke-gcloud-auth-plugin</code>, <code>aws-iam-authenticator</code>, etc.), the plugin binary must be reachable on <code>PATH</code> for the <code>kernelci-status</code> user. <code>ProtectSystem=strict</code> keeps <code>/usr/bin</code> and <code>/usr/local/bin</code> readable, but binaries living under <code>/home</code> will be invisible to the service.</p>
 
     <h4>Monitoring pending pods via Prometheus</h4>
     <p>To monitor the <b>number of pending pods</b> or <b>pod restart counts</b>, use Prometheus metrics from kube-state-metrics instead:</p>
