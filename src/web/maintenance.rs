@@ -19,10 +19,7 @@ use crate::state::AppState;
 /// Maintainers may only manage maintenance for endpoints within their team scope.
 /// Returns `None` for admins (unrestricted), or `Some(allowed endpoint names)`
 /// for a maintainer (the union across their teams — empty if they're on no team).
-async fn scope_for(
-    state: &AppState,
-    user: &AuthUser,
-) -> Result<Option<HashSet<String>>, AppError> {
+async fn scope_for(state: &AppState, user: &AuthUser) -> Result<Option<HashSet<String>>, AppError> {
     if user.role == "admin" {
         return Ok(None);
     }
@@ -35,7 +32,10 @@ async fn scope_for(
 }
 
 /// Reject if a maintainer submits endpoint names outside their scope, or none.
-fn check_submitted_names(scope: &Option<HashSet<String>>, names: &[String]) -> Result<(), AppError> {
+fn check_submitted_names(
+    scope: &Option<HashSet<String>>,
+    names: &[String],
+) -> Result<(), AppError> {
     if let Some(allowed) = scope {
         if names.is_empty() {
             return Err(AppError::BadRequest(
@@ -331,7 +331,8 @@ pub async fn close_maintenance(
     Ok(Redirect::to("/admin/maintenance"))
 }
 
-/// Check for maintenance windows starting within 1 hour and send reminder emails.
+/// Check for maintenance windows starting within 1 hour and send reminders
+/// through all enabled notification backends.
 /// Called from the scheduler after each check cycle.
 pub async fn check_maintenance_reminders(state: &AppState) {
     let db = state.db.clone();
@@ -395,27 +396,95 @@ pub async fn check_maintenance_reminders(state: &AppState) {
         }
     };
 
-    if config.get("email_enabled").is_none_or(|v| v != "true") {
+    // Which backends should receive maintenance reminders?
+    let wants = |backend: &str| {
+        config
+            .get(&format!("{backend}_enabled"))
+            .is_some_and(|v| v == "true")
+            && crate::notifications::backend_wants(&config, backend, "maintenance")
+    };
+    let (email_on, discord_on, telegram_on, textfile_on) = (
+        wants("email"),
+        wants("discord"),
+        wants("telegram"),
+        wants("textfile"),
+    );
+    if !email_on && !discord_on && !telegram_on && !textfile_on {
         return;
     }
 
     for (id, name, start_time, end_time, endpoint_names, is_deploy, changelog) in &windows {
-        let data = crate::notifications::email::MaintenanceReminderData {
-            window_name: name.clone(),
-            start_time: start_time.clone(),
-            end_time: end_time.clone(),
-            endpoint_names: endpoint_names.clone(),
-            is_deploy: *is_deploy,
-            changelog: changelog.clone(),
-        };
+        let mut sent = false;
 
-        if let Err(e) = crate::notifications::email::send_maintenance_reminder(&config, &data).await
-        {
-            error!("Failed to send maintenance reminder for '{}': {e}", name);
-            continue;
+        if email_on {
+            let data = crate::notifications::email::MaintenanceReminderData {
+                window_name: name.clone(),
+                start_time: start_time.clone(),
+                end_time: end_time.clone(),
+                endpoint_names: endpoint_names.clone(),
+                is_deploy: *is_deploy,
+                changelog: changelog.clone(),
+            };
+            match crate::notifications::email::send_maintenance_reminder(&config, &data).await {
+                Ok(()) => sent = true,
+                Err(e) => error!("Failed to send maintenance reminder for '{}': {e}", name),
+            }
         }
 
-        // Mark as sent
+        let deploy_label = if *is_deploy { " (Deploy)" } else { "" };
+        let affected = if endpoint_names.is_empty() {
+            "None specified".to_string()
+        } else {
+            endpoint_names.join(", ")
+        };
+        let text = format!(
+            "[maintenance] {name}{deploy_label} — starting in less than 1 hour | \
+             {start_time} – {end_time} UTC | Affected: {affected}"
+        );
+
+        if discord_on {
+            if let Some(url) = config.get("discord_webhook_url").filter(|u| !u.is_empty()) {
+                match crate::notifications::discord::send(&state.http_client, url, &text).await {
+                    Ok(()) => sent = true,
+                    Err(e) => error!("Discord maintenance reminder failed for '{}': {e}", name),
+                }
+            }
+        }
+
+        if telegram_on {
+            let token = config
+                .get("telegram_bot_token")
+                .cloned()
+                .unwrap_or_default();
+            let chat_id = config.get("telegram_chat_id").cloned().unwrap_or_default();
+            if !token.is_empty() && !chat_id.is_empty() {
+                match crate::notifications::telegram::send(
+                    &state.http_client,
+                    &token,
+                    &chat_id,
+                    &text,
+                )
+                .await
+                {
+                    Ok(()) => sent = true,
+                    Err(e) => error!("Telegram maintenance reminder failed for '{}': {e}", name),
+                }
+            }
+        }
+
+        if textfile_on {
+            if let Some(path) = config.get("textfile_path").filter(|p| !p.is_empty()) {
+                match crate::notifications::textfile::append(path, &text).await {
+                    Ok(()) => sent = true,
+                    Err(e) => error!("Text file maintenance reminder failed for '{}': {e}", name),
+                }
+            }
+        }
+
+        // Mark as sent if at least one backend delivered; otherwise retry next cycle
+        if !sent {
+            continue;
+        }
         let wid = *id;
         if let Err(e) = db
             .call(move |conn| crate::db::maintenance::mark_reminder_sent(conn, wid))

@@ -152,6 +152,14 @@ pub fn router(state: AppState) -> Router {
             axum::routing::post(notifications::save_notifications),
         )
         .route(
+            "/admin/notifications/test-discord",
+            axum::routing::post(notifications::test_discord),
+        )
+        .route(
+            "/admin/notifications/test-telegram",
+            axum::routing::post(notifications::test_telegram),
+        )
+        .route(
             "/admin/configuration",
             axum::routing::get(configuration::configuration_page),
         )

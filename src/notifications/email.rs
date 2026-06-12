@@ -110,11 +110,9 @@ fn recipient_mailboxes(config: &HashMap<String, String>) -> Result<Vec<Mailbox>,
 /// WARNING ↔ OK transitions go to the warnings list; everything else
 /// (anything involving CRITICAL, or unknown states) goes to the default list.
 fn recipient_key_for_transition(old_state: &str, new_state: &str) -> &'static str {
-    let is_ok_warn = |s: &str| s == "OK" || s == "WARNING";
-    if is_ok_warn(old_state) && is_ok_warn(new_state) {
-        "email_to_warnings"
-    } else {
-        "email_to"
+    match super::transition_kind(old_state, new_state) {
+        "warning" => "email_to_warnings",
+        _ => "email_to",
     }
 }
 
