@@ -29,6 +29,8 @@ pub struct AppConfigView {
     pub email_from_name: String,
     pub base_url: String,
     pub incident_escalation_minutes: String,
+    pub github_client_id: String,
+    pub github_client_secret_set: bool,
 }
 
 impl AppConfigView {
@@ -49,6 +51,8 @@ impl AppConfigView {
             email_from_name: g("email_from_name", "KernelCI Status"),
             base_url: g("base_url", ""),
             incident_escalation_minutes: g("incident_escalation_minutes", "30"),
+            github_client_id: g("github_client_id", ""),
+            github_client_secret_set: m.get("github_client_secret").is_some_and(|v| !v.is_empty()),
         }
     }
 }
@@ -95,6 +99,8 @@ pub struct ConfigurationForm {
     pub email_from_name: Option<String>,
     pub base_url: Option<String>,
     pub incident_escalation_minutes: Option<String>,
+    pub github_client_id: Option<String>,
+    pub github_client_secret: Option<String>,
 }
 
 pub async fn save_configuration(
@@ -270,6 +276,14 @@ pub async fn save_configuration(
             "incident_escalation_minutes",
             form.incident_escalation_minutes.as_deref().unwrap_or("30"),
         )?;
+        set(
+            "github_client_id",
+            form.github_client_id.as_deref().unwrap_or("").trim(),
+        )?;
+        let github_secret = form.github_client_secret.as_deref().unwrap_or("");
+        if !github_secret.is_empty() {
+            set("github_client_secret", github_secret)?;
+        }
         Ok(())
     })
     .await?;

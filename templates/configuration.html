@@ -102,6 +102,21 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
             </label>
         </div>
     </article>
+
+    <article>
+        <header><h3>GitHub OAuth</h3></header>
+        <div class="grid">
+            <label>
+                Client ID
+                <input type="text" name="github_client_id" value="{{ c.github_client_id }}" placeholder="GitHub OAuth app client ID">
+            </label>
+            <label>
+                Client Secret
+                <input type="password" name="github_client_secret" placeholder="{% if c.github_client_secret_set %}••••••••{% else %}Not set{% endif %}" autocomplete="off">
+            </label>
+        </div>
+        <p><small>Configure the GitHub OAuth app callback URL as <code>{{ c.base_url }}/login/github/callback</code>. The Public Base URL above must be set for production deployments.</small></p>
+    </article>
 </form>
 
 <article>

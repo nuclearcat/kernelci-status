@@ -80,6 +80,7 @@ pub fn run_migrations(conn: &Connection) -> rusqlite::Result<()> {
     migrate_deploy_changelog(conn)?;
     migrate_user_roles(conn)?;
     migrate_teams(conn)?;
+    migrate_github_usernames(conn)?;
 
     Ok(())
 }
@@ -122,6 +123,27 @@ fn migrate_teams(conn: &Connection) -> rusqlite::Result<()> {
             PRIMARY KEY (team_id, endpoint_name)
         );
         ",
+    )?;
+    Ok(())
+}
+
+/// Add an optional GitHub username association for OAuth login. The username is
+/// treated case-insensitively because GitHub login names are not case-sensitive.
+fn migrate_github_usernames(conn: &Connection) -> rusqlite::Result<()> {
+    let has_github_username = {
+        let mut stmt = conn.prepare("PRAGMA table_info(users)")?;
+        let names: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>, _>>()?;
+        names.iter().any(|n| n == "github_username")
+    };
+    if !has_github_username {
+        conn.execute_batch("ALTER TABLE users ADD COLUMN github_username TEXT")?;
+    }
+    conn.execute_batch(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_github_username \
+         ON users(github_username COLLATE NOCASE) \
+         WHERE github_username IS NOT NULL AND github_username != ''",
     )?;
     Ok(())
 }

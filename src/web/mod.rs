@@ -60,6 +60,11 @@ pub fn router(state: AppState) -> Router {
         // Login/logout (public)
         .route("/login", axum::routing::get(login::login_page))
         .route("/login", axum::routing::post(login::login_submit))
+        .route("/login/github", axum::routing::get(login::github_login))
+        .route(
+            "/login/github/callback",
+            axum::routing::get(login::github_callback),
+        )
         .route("/logout", axum::routing::post(login::logout))
         // Admin routes (auth required)
         .route("/admin", axum::routing::get(dashboard::dashboard))
@@ -193,6 +198,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/admin/users/email/{id}",
             axum::routing::post(users::update_email),
+        )
+        .route(
+            "/admin/users/github/{id}",
+            axum::routing::post(users::update_github),
         )
         .route(
             "/admin/users/delete/{id}",

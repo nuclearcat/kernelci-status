@@ -12,6 +12,7 @@ pub struct User {
     pub created_at: String,
     pub email: Option<String>,
     pub role: String,
+    pub github_username: Option<String>,
 }
 
 /// Roles a user may hold. `admin` has full access; `maintainer` may only manage
@@ -22,7 +23,7 @@ pub fn valid_role(role: &str) -> bool {
 
 pub fn get_by_username(conn: &Connection, username: &str) -> rusqlite::Result<Option<User>> {
     conn.query_row(
-        "SELECT id, username, password_hash, created_at, email, role FROM users WHERE username = ?1",
+        "SELECT id, username, password_hash, created_at, email, role, github_username FROM users WHERE username = ?1",
         params![username],
         |row| {
             Ok(User {
@@ -32,6 +33,7 @@ pub fn get_by_username(conn: &Connection, username: &str) -> rusqlite::Result<Op
                 created_at: row.get(3)?,
                 email: row.get(4)?,
                 role: row.get(5)?,
+                github_username: row.get(6)?,
             })
         },
     )
@@ -40,7 +42,7 @@ pub fn get_by_username(conn: &Connection, username: &str) -> rusqlite::Result<Op
 
 pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<User>> {
     conn.query_row(
-        "SELECT id, username, password_hash, created_at, email, role FROM users WHERE id = ?1",
+        "SELECT id, username, password_hash, created_at, email, role, github_username FROM users WHERE id = ?1",
         params![id],
         |row| {
             Ok(User {
@@ -50,6 +52,30 @@ pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<User>> {
                 created_at: row.get(3)?,
                 email: row.get(4)?,
                 role: row.get(5)?,
+                github_username: row.get(6)?,
+            })
+        },
+    )
+    .optional()
+}
+
+pub fn get_by_github_username(
+    conn: &Connection,
+    github_username: &str,
+) -> rusqlite::Result<Option<User>> {
+    conn.query_row(
+        "SELECT id, username, password_hash, created_at, email, role, github_username \
+         FROM users WHERE github_username = ?1 COLLATE NOCASE",
+        params![github_username],
+        |row| {
+            Ok(User {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                password_hash: row.get(2)?,
+                created_at: row.get(3)?,
+                email: row.get(4)?,
+                role: row.get(5)?,
+                github_username: row.get(6)?,
             })
         },
     )
@@ -58,7 +84,7 @@ pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<User>> {
 
 pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<User>> {
     let mut stmt = conn.prepare(
-        "SELECT id, username, password_hash, created_at, email, role FROM users ORDER BY username",
+        "SELECT id, username, password_hash, created_at, email, role, github_username FROM users ORDER BY username",
     )?;
     let rows = stmt.query_map([], |row| {
         Ok(User {
@@ -68,6 +94,7 @@ pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<User>> {
             created_at: row.get(3)?,
             email: row.get(4)?,
             role: row.get(5)?,
+            github_username: row.get(6)?,
         })
     })?;
     rows.collect()
@@ -115,10 +142,24 @@ pub fn update_email(conn: &Connection, id: i64, email: &str) -> rusqlite::Result
     Ok(rows > 0)
 }
 
+pub fn update_github_username(
+    conn: &Connection,
+    id: i64,
+    github_username: &str,
+) -> rusqlite::Result<bool> {
+    let clean = github_username.trim().trim_start_matches('@');
+    let val = if clean.is_empty() { None } else { Some(clean) };
+    let rows = conn.execute(
+        "UPDATE users SET github_username = ?1 WHERE id = ?2",
+        params![val, id],
+    )?;
+    Ok(rows > 0)
+}
+
 /// Return all users that have a non-null, non-empty email.
 pub fn list_with_email(conn: &Connection) -> rusqlite::Result<Vec<User>> {
     let mut stmt = conn.prepare(
-        "SELECT id, username, password_hash, created_at, email, role \
+        "SELECT id, username, password_hash, created_at, email, role, github_username \
          FROM users WHERE email IS NOT NULL AND email != '' ORDER BY username",
     )?;
     let rows = stmt.query_map([], |row| {
@@ -129,6 +170,7 @@ pub fn list_with_email(conn: &Connection) -> rusqlite::Result<Vec<User>> {
             created_at: row.get(3)?,
             email: row.get(4)?,
             role: row.get(5)?,
+            github_username: row.get(6)?,
         })
     })?;
     rows.collect()

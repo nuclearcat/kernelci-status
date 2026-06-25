@@ -175,6 +175,47 @@ pub async fn update_email(
     Ok(Redirect::to("/admin/users"))
 }
 
+#[derive(Deserialize)]
+pub struct UpdateGithubForm {
+    pub github_username: String,
+}
+
+pub async fn update_github(
+    State(state): State<AppState>,
+    _user: AdminUser,
+    Path(id): Path<i64>,
+    Form(form): Form<UpdateGithubForm>,
+) -> Result<impl IntoResponse, AppError> {
+    let github_username = form
+        .github_username
+        .trim()
+        .trim_start_matches('@')
+        .to_string();
+    if !github_username.is_empty() {
+        let lookup = github_username.clone();
+        let db = state.db.clone();
+        if let Some(existing) = db
+            .call(move |conn| crate::db::users::get_by_github_username(conn, &lookup))
+            .await?
+        {
+            if existing.id != id {
+                return Err(AppError::BadRequest(format!(
+                    "GitHub username '{github_username}' is already assigned to another user"
+                )));
+            }
+        }
+    }
+
+    let db = state.db.clone();
+    db.call(move |conn| {
+        crate::db::users::update_github_username(conn, id, &github_username)?;
+        Ok(())
+    })
+    .await?;
+
+    Ok(Redirect::to("/admin/users"))
+}
+
 pub async fn delete_user(
     State(state): State<AppState>,
     auth: AdminUser,
