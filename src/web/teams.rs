@@ -100,7 +100,9 @@ pub async fn add_team(
 ) -> Result<impl IntoResponse, AppError> {
     let name = form.name.trim().to_string();
     if name.is_empty() {
-        return Err(AppError::BadRequest("Team name cannot be empty".to_string()));
+        return Err(AppError::BadRequest(
+            "Team name cannot be empty".to_string(),
+        ));
     }
     let db = state.db.clone();
     db.call(move |conn| {

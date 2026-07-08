@@ -48,14 +48,18 @@ pub fn members_of(conn: &Connection, team_id: i64) -> rusqlite::Result<HashSet<i
 }
 
 pub fn endpoints_of(conn: &Connection, team_id: i64) -> rusqlite::Result<Vec<String>> {
-    let mut stmt = conn
-        .prepare("SELECT endpoint_name FROM team_endpoints WHERE team_id = ?1 ORDER BY endpoint_name")?;
+    let mut stmt = conn.prepare(
+        "SELECT endpoint_name FROM team_endpoints WHERE team_id = ?1 ORDER BY endpoint_name",
+    )?;
     stmt.query_map(params![team_id], |row| row.get::<_, String>(0))?
         .collect()
 }
 
 pub fn set_members(conn: &Connection, team_id: i64, user_ids: &[i64]) -> rusqlite::Result<()> {
-    conn.execute("DELETE FROM team_members WHERE team_id = ?1", params![team_id])?;
+    conn.execute(
+        "DELETE FROM team_members WHERE team_id = ?1",
+        params![team_id],
+    )?;
     for uid in user_ids {
         conn.execute(
             "INSERT OR IGNORE INTO team_members (team_id, user_id) VALUES (?1, ?2)",
@@ -66,7 +70,10 @@ pub fn set_members(conn: &Connection, team_id: i64, user_ids: &[i64]) -> rusqlit
 }
 
 pub fn set_endpoints(conn: &Connection, team_id: i64, names: &[String]) -> rusqlite::Result<()> {
-    conn.execute("DELETE FROM team_endpoints WHERE team_id = ?1", params![team_id])?;
+    conn.execute(
+        "DELETE FROM team_endpoints WHERE team_id = ?1",
+        params![team_id],
+    )?;
     for name in names {
         conn.execute(
             "INSERT OR IGNORE INTO team_endpoints (team_id, endpoint_name) VALUES (?1, ?2)",
