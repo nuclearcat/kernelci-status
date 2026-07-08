@@ -177,9 +177,9 @@ pub async fn github_login(State(state): State<AppState>, headers: HeaderMap) -> 
             return render_login(&state, Some("GitHub login is not configured".to_string())).await;
         }
     };
-    if !config
+    if config
         .get("github_client_secret")
-        .is_some_and(|v| !v.is_empty())
+        .is_none_or(|v| v.is_empty())
     {
         return render_login(&state, Some("GitHub login is not configured".to_string())).await;
     }
