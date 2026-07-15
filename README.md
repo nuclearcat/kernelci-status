@@ -46,7 +46,11 @@ Useful options:
 kernelci-status --config /etc/kernelci-status.toml
 kernelci-status --port 2001 --db-path /var/lib/kernelci-status/status.db
 kernelci-status create-user admin
+kernelci-status passwd admin
 ```
+
+`passwd` changes an existing user's password and invalidates all of their active sessions. Use
+`--config` or `--db-path` to select the correct database when it is not at the default location.
 
 ## Configuration
 

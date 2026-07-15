@@ -6,6 +6,11 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
 
 # Changelog
 
+## Unreleased
+
+### Added
+- `passwd <username>` CLI command to reset an existing user's password and invalidate their sessions
+
 ## 0.1.3
 
 ### Added

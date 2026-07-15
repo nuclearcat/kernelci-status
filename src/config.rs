@@ -90,6 +90,11 @@ pub enum Commands {
         /// Username
         username: String,
     },
+    /// Change an existing user's password (reads password from stdin)
+    Passwd {
+        /// Username
+        username: String,
+    },
 }
 
 impl AppConfig {
@@ -178,5 +183,23 @@ async fn load_toml(path: &str) -> TomlConfig {
             warn!("Failed to read {path}: {e}, using defaults");
             TomlConfig::default()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_passwd_subcommand() {
+        let cli =
+            Cli::try_parse_from(["kernelci-status", "--db-path", "test.db", "passwd", "admin"])
+                .unwrap();
+
+        assert_eq!(cli.db_path.as_deref(), Some("test.db"));
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Passwd { username }) if username == "admin"
+        ));
     }
 }
