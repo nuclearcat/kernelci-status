@@ -12,6 +12,9 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
 - Telegram bot notification backend for status-change alerts (Bot Token + Chat ID on the Notifications page); bot token is write-only in the UI and masked in `GET /api/config`
 - `passwd <username>` CLI command to reset an existing user's password and invalidate their sessions
 
+### Changed
+- Debian package build environment upgraded from Bookworm to Trixie
+
 ## 0.1.3
 
 ### Added

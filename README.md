@@ -66,7 +66,7 @@ Remove the bootstrap credentials after creating the initial user.
 
 ## Debian Package
 
-Build a Debian Bookworm package inside Docker:
+Build a Debian Trixie package inside Docker:
 
 ```sh
 ./build_deb.sh
