@@ -53,14 +53,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let conn = db::open_and_migrate(&cfg.db_path).await?;
 
-    // Handle create-user subcommand
-    if let Some(Commands::CreateUser {
-        username,
-        maintainer,
-    }) = &cfg.command
-    {
-        let username = username.clone();
-        let role = if *maintainer { "maintainer" } else { "admin" };
+    // Handle user-management subcommands
+    if let Some(command) = &cfg.command {
+        let username = match command {
+            Commands::CreateUser { username, .. } | Commands::Passwd { username } => {
+                username.clone()
+            }
+        };
         eprintln!("Enter password for user '{username}': ");
         let mut password = String::new();
         std::io::stdin().read_line(&mut password)?;
@@ -74,13 +73,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let hash = auth::password::hash_password(&password)
             .map_err(|e| format!("Failed to hash password: {e}"))?;
 
-        conn.call(move |conn| -> rusqlite::Result<()> {
-            db::users::insert(conn, &username, &hash, role)?;
-            Ok(())
-        })
-        .await?;
-
-        eprintln!("User created successfully");
+        match command {
+            Commands::CreateUser { maintainer, .. } => {
+                let role = if *maintainer { "maintainer" } else { "admin" };
+                conn.call(move |conn| -> rusqlite::Result<()> {
+                    db::users::insert(conn, &username, &hash, role)?;
+                    Ok(())
+                })
+                .await?;
+                eprintln!("User created successfully");
+            }
+            Commands::Passwd { .. } => {
+                let display_username = username.clone();
+                let updated = conn
+                    .call(move |conn| {
+                        db::users::update_password_by_username(conn, &username, &hash)
+                    })
+                    .await?;
+                if !updated {
+                    eprintln!("User '{display_username}' does not exist");
+                    std::process::exit(1);
+                }
+                eprintln!("Password changed successfully");
+            }
+        }
         return Ok(());
     }
 

@@ -129,6 +129,31 @@ pub fn count_admins(conn: &Connection) -> rusqlite::Result<i64> {
     })
 }
 
+/// Update a user's password and invalidate all of their active sessions.
+/// Returns false when the username does not exist.
+pub fn update_password_by_username(
+    conn: &mut Connection,
+    username: &str,
+    password_hash: &str,
+) -> rusqlite::Result<bool> {
+    let tx = conn.transaction()?;
+    let rows = tx.execute(
+        "UPDATE users SET password_hash = ?1 WHERE username = ?2",
+        params![password_hash, username],
+    )?;
+
+    if rows == 0 {
+        return Ok(false);
+    }
+
+    tx.execute(
+        "DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE username = ?1)",
+        params![username],
+    )?;
+    tx.commit()?;
+    Ok(true)
+}
+
 pub fn update_email(conn: &Connection, id: i64, email: &str) -> rusqlite::Result<bool> {
     let val = if email.trim().is_empty() {
         None
@@ -182,4 +207,42 @@ pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<bool> {
     conn.execute("DELETE FROM team_members WHERE user_id = ?1", params![id])?;
     let rows = conn.execute("DELETE FROM users WHERE id = ?1", params![id])?;
     Ok(rows > 0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn password_update_revokes_sessions() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        crate::db::schema::run_migrations(&conn).unwrap();
+        let user_id = insert(&conn, "admin", "old-hash", "admin").unwrap();
+        conn.execute(
+            "INSERT INTO sessions (token, user_id, expires_at) VALUES (?1, ?2, ?3)",
+            params!["token", user_id, "2099-01-01 00:00:00"],
+        )
+        .unwrap();
+
+        assert!(update_password_by_username(&mut conn, "admin", "new-hash").unwrap());
+        assert_eq!(
+            get_by_username(&conn, "admin")
+                .unwrap()
+                .unwrap()
+                .password_hash,
+            "new-hash"
+        );
+        let session_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(session_count, 0);
+    }
+
+    #[test]
+    fn password_update_reports_missing_user() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        crate::db::schema::run_migrations(&conn).unwrap();
+
+        assert!(!update_password_by_username(&mut conn, "missing", "new-hash").unwrap());
+    }
 }
