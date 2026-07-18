@@ -7,6 +7,23 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
 {% block title %}Maintenance Windows{% endblock %}
 {% block username %}{{ username }}{% endblock %}
 
+{# Maintainers see only Status + Maintenance; admins get the full nav.
+   Keep this list in sync with base.html's adminnav block. #}
+{% block adminnav %}
+{% if is_admin %}
+<li><a href="/admin">Dashboard</a></li>
+<li><a href="/admin/endpoints">Endpoints</a></li>
+<li><a href="/admin/incidents">Incidents</a></li>
+<li><a href="/admin/notifications">Notifications</a></li>
+<li><a href="/admin/configuration">Configuration</a></li>
+<li><a href="/admin/users">Users</a></li>
+<li><a href="/admin/teams">Teams</a></li>
+<li><a href="/admin/reports">Reports</a></li>
+<li><a href="/admin/history">History</a></li>
+<li><a href="/admin/help">Help</a></li>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <h2>Maintenance Windows</h2>
 <p>Schedule maintenance windows to mark endpoints as under planned maintenance. Checks still run during maintenance — the actual health state is recorded alongside the maintenance indicator.</p>
@@ -17,6 +34,13 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
         <label>
             <input type="checkbox" id="hotfix-toggle">
             <strong>Hotfix</strong> <small>(short-notice emergency maintenance, starts in 30 min, 15 min window)</small>
+        </label>
+        <label>
+            Scenario
+            <select id="maintenance-scenario">
+                <option value="">&lt;Select Scenario&gt;</option>
+                <option value="production-update" data-endpoints="Production pipeline|Production API">Production update</option>
+            </select>
         </label>
         <label>
             Description
@@ -39,6 +63,18 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
             var e = new Date(Date.now() + 25*3600*1000);
             document.getElementById('new-start').value = fmt(s);
             document.getElementById('new-end').value = fmt(e);
+
+            document.getElementById('maintenance-scenario').addEventListener('change', function() {
+                var selected = this.options[this.selectedIndex];
+                var endpointNames = selected.dataset.endpoints ? selected.dataset.endpoints.split('|') : [];
+                var endpointSet = endpointNames.reduce(function(set, name) {
+                    set[name] = true;
+                    return set;
+                }, {});
+                document.querySelectorAll('#new-maintenance-form input[name="endpoint_names"]').forEach(function(input) {
+                    input.checked = !!endpointSet[input.value];
+                });
+            });
 
             document.getElementById('hotfix-toggle').addEventListener('change', function() {
                 var form = document.getElementById('new-maintenance-form');

@@ -29,6 +29,11 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
                 <input type="password" id="password" name="password" required>
                 <button type="submit">Sign in</button>
             </form>
+            {% if github_enabled %}
+            <form method="get" action="/login/github">
+                <button type="submit" class="outline">Login by GitHub</button>
+            </form>
+            {% endif %}
         </article>
     </div>
 </body>

@@ -10,6 +10,7 @@ pub mod maintenance;
 pub mod reports;
 pub mod schema;
 pub mod sessions;
+pub mod teams;
 pub mod users;
 
 use tokio_rusqlite::Connection;

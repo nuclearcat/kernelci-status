@@ -52,16 +52,22 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
         </ul>
         <ul>
             <li><a href="/status">Status</a></li>
+            <li><a href="/admin/maintenance">Maintenance</a></li>
+            {# Admin-only links. Maintainers only ever render the maintenance page,
+               which overrides this block to hide them; every other page is
+               admin-gated so the default (full nav) always applies there. #}
+            {% block adminnav %}
             <li><a href="/admin">Dashboard</a></li>
             <li><a href="/admin/endpoints">Endpoints</a></li>
-            <li><a href="/admin/maintenance">Maintenance</a></li>
             <li><a href="/admin/incidents">Incidents</a></li>
             <li><a href="/admin/notifications">Notifications</a></li>
             <li><a href="/admin/configuration">Configuration</a></li>
             <li><a href="/admin/users">Users</a></li>
+            <li><a href="/admin/teams">Teams</a></li>
             <li><a href="/admin/reports">Reports</a></li>
             <li><a href="/admin/history">History</a></li>
             <li><a href="/admin/help">Help</a></li>
+            {% endblock %}
             <li>
                 <form method="post" action="/logout" style="margin:0">
                     <button type="submit" class="logout-btn">

@@ -21,6 +21,7 @@ fn api_token_matches(stored: Option<String>, candidate: &str) -> bool {
 pub struct AuthUser {
     pub user_id: i64,
     pub username: String,
+    pub role: String,
 }
 
 impl FromRequestParts<AppState> for AuthUser {
@@ -66,6 +67,7 @@ impl FromRequestParts<AppState> for AuthUser {
                         return Ok(AuthUser {
                             user_id: 0,
                             username: "api".to_string(),
+                            role: "admin".to_string(),
                         });
                     }
                 }
@@ -94,9 +96,37 @@ impl FromRequestParts<AppState> for AuthUser {
             Ok(Some(u)) => Ok(AuthUser {
                 user_id: u.id,
                 username: u.username,
+                role: u.role,
             }),
             _ => Err(Redirect::to("/login").into_response()),
         }
+    }
+}
+
+/// Authenticated user that must hold the `admin` role. Gates every admin route
+/// except maintenance. An authenticated maintainer is redirected to the one page
+/// they can use rather than shown a bare 403; an unauthenticated request follows
+/// `AuthUser` and is sent to `/login`.
+pub struct AdminUser {
+    pub user_id: i64,
+    pub username: String,
+}
+
+impl FromRequestParts<AppState> for AdminUser {
+    type Rejection = Response;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let user = AuthUser::from_request_parts(parts, state).await?;
+        if user.role != "admin" {
+            return Err(Redirect::to("/admin/maintenance").into_response());
+        }
+        Ok(AdminUser {
+            user_id: user.user_id,
+            username: user.username,
+        })
     }
 }
 

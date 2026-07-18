@@ -273,6 +273,19 @@ pub fn mark_reminder_sent(conn: &Connection, id: i64) -> rusqlite::Result<()> {
     Ok(())
 }
 
+/// Distinct endpoint *names* attached to a window — used to check a maintainer's
+/// scope before they manage the window.
+pub fn get_endpoint_names(conn: &Connection, window_id: i64) -> rusqlite::Result<Vec<String>> {
+    let mut stmt = conn.prepare(
+        "SELECT DISTINCT e.name
+         FROM maintenance_window_endpoints mwe
+         JOIN endpoints e ON e.id = mwe.endpoint_id
+         WHERE mwe.window_id = ?1",
+    )?;
+    stmt.query_map(params![window_id], |row| row.get::<_, String>(0))?
+        .collect()
+}
+
 fn get_endpoint_ids(conn: &Connection, window_id: i64) -> rusqlite::Result<Vec<i64>> {
     let mut stmt =
         conn.prepare("SELECT endpoint_id FROM maintenance_window_endpoints WHERE window_id = ?1")?;

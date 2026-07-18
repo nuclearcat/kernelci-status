@@ -10,7 +10,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use tokio::io::AsyncWriteExt;
 
-use crate::auth::AuthUser;
+use crate::auth::AdminUser;
 use crate::db::endpoints::Endpoint;
 use crate::error::AppError;
 use crate::state::AppState;
@@ -55,7 +55,7 @@ struct HistoryTableTemplate {
 
 pub async fn history_page(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
     Query(query): Query<HistoryQuery>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
@@ -167,7 +167,7 @@ pub async fn history_page(
 
 pub async fn export_old(
     State(state): State<AppState>,
-    _user: AuthUser,
+    _user: AdminUser,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
 

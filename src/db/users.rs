@@ -11,11 +11,19 @@ pub struct User {
     pub password_hash: String,
     pub created_at: String,
     pub email: Option<String>,
+    pub role: String,
+    pub github_username: Option<String>,
+}
+
+/// Roles a user may hold. `admin` has full access; `maintainer` may only manage
+/// maintenance windows for endpoints within their team scope.
+pub fn valid_role(role: &str) -> bool {
+    matches!(role, "admin" | "maintainer")
 }
 
 pub fn get_by_username(conn: &Connection, username: &str) -> rusqlite::Result<Option<User>> {
     conn.query_row(
-        "SELECT id, username, password_hash, created_at, email FROM users WHERE username = ?1",
+        "SELECT id, username, password_hash, created_at, email, role, github_username FROM users WHERE username = ?1",
         params![username],
         |row| {
             Ok(User {
@@ -24,6 +32,8 @@ pub fn get_by_username(conn: &Connection, username: &str) -> rusqlite::Result<Op
                 password_hash: row.get(2)?,
                 created_at: row.get(3)?,
                 email: row.get(4)?,
+                role: row.get(5)?,
+                github_username: row.get(6)?,
             })
         },
     )
@@ -32,7 +42,7 @@ pub fn get_by_username(conn: &Connection, username: &str) -> rusqlite::Result<Op
 
 pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<User>> {
     conn.query_row(
-        "SELECT id, username, password_hash, created_at, email FROM users WHERE id = ?1",
+        "SELECT id, username, password_hash, created_at, email, role, github_username FROM users WHERE id = ?1",
         params![id],
         |row| {
             Ok(User {
@@ -41,6 +51,31 @@ pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<User>> {
                 password_hash: row.get(2)?,
                 created_at: row.get(3)?,
                 email: row.get(4)?,
+                role: row.get(5)?,
+                github_username: row.get(6)?,
+            })
+        },
+    )
+    .optional()
+}
+
+pub fn get_by_github_username(
+    conn: &Connection,
+    github_username: &str,
+) -> rusqlite::Result<Option<User>> {
+    conn.query_row(
+        "SELECT id, username, password_hash, created_at, email, role, github_username \
+         FROM users WHERE github_username = ?1 COLLATE NOCASE",
+        params![github_username],
+        |row| {
+            Ok(User {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                password_hash: row.get(2)?,
+                created_at: row.get(3)?,
+                email: row.get(4)?,
+                role: row.get(5)?,
+                github_username: row.get(6)?,
             })
         },
     )
@@ -49,7 +84,7 @@ pub fn get_by_id(conn: &Connection, id: i64) -> rusqlite::Result<Option<User>> {
 
 pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<User>> {
     let mut stmt = conn.prepare(
-        "SELECT id, username, password_hash, created_at, email FROM users ORDER BY username",
+        "SELECT id, username, password_hash, created_at, email, role, github_username FROM users ORDER BY username",
     )?;
     let rows = stmt.query_map([], |row| {
         Ok(User {
@@ -58,17 +93,40 @@ pub fn list_all(conn: &Connection) -> rusqlite::Result<Vec<User>> {
             password_hash: row.get(2)?,
             created_at: row.get(3)?,
             email: row.get(4)?,
+            role: row.get(5)?,
+            github_username: row.get(6)?,
         })
     })?;
     rows.collect()
 }
 
-pub fn insert(conn: &Connection, username: &str, password_hash: &str) -> rusqlite::Result<i64> {
+pub fn insert(
+    conn: &Connection,
+    username: &str,
+    password_hash: &str,
+    role: &str,
+) -> rusqlite::Result<i64> {
     conn.execute(
-        "INSERT INTO users (username, password_hash) VALUES (?1, ?2)",
-        params![username, password_hash],
+        "INSERT INTO users (username, password_hash, role) VALUES (?1, ?2, ?3)",
+        params![username, password_hash, role],
     )?;
     Ok(conn.last_insert_rowid())
+}
+
+pub fn update_role(conn: &Connection, id: i64, role: &str) -> rusqlite::Result<bool> {
+    let rows = conn.execute(
+        "UPDATE users SET role = ?1 WHERE id = ?2",
+        params![role, id],
+    )?;
+    Ok(rows > 0)
+}
+
+/// Number of users with the `admin` role — used to prevent locking out the last
+/// administrator.
+pub fn count_admins(conn: &Connection) -> rusqlite::Result<i64> {
+    conn.query_row("SELECT COUNT(*) FROM users WHERE role = 'admin'", [], |r| {
+        r.get(0)
+    })
 }
 
 /// Update a user's password and invalidate all of their active sessions.
@@ -109,10 +167,24 @@ pub fn update_email(conn: &Connection, id: i64, email: &str) -> rusqlite::Result
     Ok(rows > 0)
 }
 
+pub fn update_github_username(
+    conn: &Connection,
+    id: i64,
+    github_username: &str,
+) -> rusqlite::Result<bool> {
+    let clean = github_username.trim().trim_start_matches('@');
+    let val = if clean.is_empty() { None } else { Some(clean) };
+    let rows = conn.execute(
+        "UPDATE users SET github_username = ?1 WHERE id = ?2",
+        params![val, id],
+    )?;
+    Ok(rows > 0)
+}
+
 /// Return all users that have a non-null, non-empty email.
 pub fn list_with_email(conn: &Connection) -> rusqlite::Result<Vec<User>> {
     let mut stmt = conn.prepare(
-        "SELECT id, username, password_hash, created_at, email \
+        "SELECT id, username, password_hash, created_at, email, role, github_username \
          FROM users WHERE email IS NOT NULL AND email != '' ORDER BY username",
     )?;
     let rows = stmt.query_map([], |row| {
@@ -122,14 +194,17 @@ pub fn list_with_email(conn: &Connection) -> rusqlite::Result<Vec<User>> {
             password_hash: row.get(2)?,
             created_at: row.get(3)?,
             email: row.get(4)?,
+            role: row.get(5)?,
+            github_username: row.get(6)?,
         })
     })?;
     rows.collect()
 }
 
 pub fn delete(conn: &Connection, id: i64) -> rusqlite::Result<bool> {
-    // Delete associated sessions first
+    // Delete associated sessions and team memberships first
     conn.execute("DELETE FROM sessions WHERE user_id = ?1", params![id])?;
+    conn.execute("DELETE FROM team_members WHERE user_id = ?1", params![id])?;
     let rows = conn.execute("DELETE FROM users WHERE id = ?1", params![id])?;
     Ok(rows > 0)
 }
@@ -142,7 +217,7 @@ mod tests {
     fn password_update_revokes_sessions() {
         let mut conn = Connection::open_in_memory().unwrap();
         crate::db::schema::run_migrations(&conn).unwrap();
-        let user_id = insert(&conn, "admin", "old-hash").unwrap();
+        let user_id = insert(&conn, "admin", "old-hash", "admin").unwrap();
         conn.execute(
             "INSERT INTO sessions (token, user_id, expires_at) VALUES (?1, ?2, ?3)",
             params!["token", user_id, "2099-01-01 00:00:00"],

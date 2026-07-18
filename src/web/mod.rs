@@ -14,6 +14,7 @@ pub mod maintenance;
 pub mod notifications;
 pub mod reports;
 pub mod status;
+pub mod teams;
 pub mod users;
 
 use axum::Router;
@@ -59,6 +60,11 @@ pub fn router(state: AppState) -> Router {
         // Login/logout (public)
         .route("/login", axum::routing::get(login::login_page))
         .route("/login", axum::routing::post(login::login_submit))
+        .route("/login/github", axum::routing::get(login::github_login))
+        .route(
+            "/login/github/callback",
+            axum::routing::get(login::github_callback),
+        )
         .route("/logout", axum::routing::post(login::logout))
         // Admin routes (auth required)
         .route("/admin", axum::routing::get(dashboard::dashboard))
@@ -151,6 +157,14 @@ pub fn router(state: AppState) -> Router {
             axum::routing::post(notifications::save_notifications),
         )
         .route(
+            "/admin/notifications/test-discord",
+            axum::routing::post(notifications::test_discord),
+        )
+        .route(
+            "/admin/notifications/test-telegram",
+            axum::routing::post(notifications::test_telegram),
+        )
+        .route(
             "/admin/configuration",
             axum::routing::get(configuration::configuration_page),
         )
@@ -174,6 +188,10 @@ pub fn router(state: AppState) -> Router {
         .route("/admin/users", axum::routing::get(users::users_page))
         .route("/admin/users/add", axum::routing::post(users::add_user))
         .route(
+            "/admin/users/role/{id}",
+            axum::routing::post(users::update_role),
+        )
+        .route(
             "/admin/users/password/{id}",
             axum::routing::post(users::change_password),
         )
@@ -182,8 +200,26 @@ pub fn router(state: AppState) -> Router {
             axum::routing::post(users::update_email),
         )
         .route(
+            "/admin/users/github/{id}",
+            axum::routing::post(users::update_github),
+        )
+        .route(
             "/admin/users/delete/{id}",
             axum::routing::post(users::delete_user),
+        )
+        .route("/admin/teams", axum::routing::get(teams::teams_page))
+        .route("/admin/teams/add", axum::routing::post(teams::add_team))
+        .route(
+            "/admin/teams/delete/{id}",
+            axum::routing::post(teams::delete_team),
+        )
+        .route(
+            "/admin/teams/{id}/members",
+            axum::routing::post(teams::update_members),
+        )
+        .route(
+            "/admin/teams/{id}/endpoints",
+            axum::routing::post(teams::update_endpoints),
         )
         .route(
             "/admin/history",

@@ -9,7 +9,7 @@ use axum::response::{Html, IntoResponse};
 use chrono::Datelike;
 use serde::Deserialize;
 
-use crate::auth::AuthUser;
+use crate::auth::AdminUser;
 use crate::db::reports::{IncidentSummary, MaintenanceSummary, ServiceUptime};
 use crate::error::AppError;
 use crate::state::AppState;
@@ -79,7 +79,7 @@ struct ReportPreviewTemplate {
 
 pub async fn reports_page(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
 ) -> Result<impl IntoResponse, AppError> {
     let config = state.config_cache.read().await;
     let weekly_enabled = config
@@ -122,7 +122,7 @@ pub struct ReportScheduleForm {
 
 pub async fn save_report_schedule(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
     Form(form): Form<ReportScheduleForm>,
 ) -> Result<impl IntoResponse, AppError> {
     let weekly_day = form
@@ -223,7 +223,7 @@ pub struct PreviewQuery {
 
 pub async fn report_preview(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
     Form(query): Form<PreviewQuery>,
 ) -> Result<impl IntoResponse, AppError> {
     let report_type = query.report_type.unwrap_or_else(|| "weekly".to_string());

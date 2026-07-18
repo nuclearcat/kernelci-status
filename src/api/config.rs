@@ -24,7 +24,7 @@ pub async fn get_config(
     let filtered: HashMap<String, String> = config
         .into_iter()
         .map(|(k, v)| {
-            if k == "smtp_password" || k == "api_token" {
+            if k == "smtp_password" || k == "api_token" || k == "telegram_bot_token" {
                 (k, "********".to_string())
             } else {
                 (k, v)

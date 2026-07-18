@@ -18,6 +18,8 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
 <div class="success-message">{{ success }}</div>
 {% endif %}
 
+<p><small>For each channel, choose which notification types it receives: <strong>Critical alerts</strong> are state changes involving CRITICAL (including recovery), <strong>Warnings</strong> are WARNING&nbsp;↔&nbsp;OK changes, and <strong>Maintenance reminders</strong> are sent within 1 hour of a maintenance window starting.</small></p>
+
 <form method="post" action="/admin/notifications">
     <article>
         <header><h3>Email Notifications</h3></header>
@@ -37,6 +39,23 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
                    placeholder="warnings@example.com">
             <small>Comma-separated list. Receives only WARNING&nbsp;↔&nbsp;OK transitions. Leave empty to suppress warning emails entirely.</small>
         </label>
+        <fieldset>
+            <legend>Send:</legend>
+            <div class="grid">
+                <label>
+                    <input type="checkbox" name="email_notify_critical" {% if c.email_notify_critical %}checked{% endif %}>
+                    Critical alerts
+                </label>
+                <label>
+                    <input type="checkbox" name="email_notify_warning" {% if c.email_notify_warning %}checked{% endif %}>
+                    Warnings
+                </label>
+                <label>
+                    <input type="checkbox" name="email_notify_maintenance" {% if c.email_notify_maintenance %}checked{% endif %}>
+                    Maintenance reminders
+                </label>
+            </div>
+        </fieldset>
     </article>
 
     <article>
@@ -49,6 +68,59 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
             Webhook URL
             <input type="text" name="discord_webhook_url" value="{{ c.discord_webhook_url }}" placeholder="https://discord.com/api/webhooks/...">
         </label>
+        <fieldset>
+            <legend>Send:</legend>
+            <div class="grid">
+                <label>
+                    <input type="checkbox" name="discord_notify_critical" {% if c.discord_notify_critical %}checked{% endif %}>
+                    Critical alerts
+                </label>
+                <label>
+                    <input type="checkbox" name="discord_notify_warning" {% if c.discord_notify_warning %}checked{% endif %}>
+                    Warnings
+                </label>
+                <label>
+                    <input type="checkbox" name="discord_notify_maintenance" {% if c.discord_notify_maintenance %}checked{% endif %}>
+                    Maintenance reminders
+                </label>
+            </div>
+        </fieldset>
+    </article>
+
+    <article>
+        <header><h3>Telegram</h3></header>
+        <label>
+            <input type="checkbox" name="telegram_enabled" {% if c.telegram_enabled %}checked{% endif %}>
+            Enable Telegram notifications
+        </label>
+        <label>
+            Bot Token
+            <input type="password" name="telegram_bot_token" autocomplete="off"
+                   placeholder="{% if c.telegram_bot_token.is_empty() %}Not set{% else %}••••••••{% endif %}">
+            <small>Token from <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a>. Leave blank to keep the current token.</small>
+        </label>
+        <label>
+            Chat ID
+            <input type="text" name="telegram_chat_id" value="{{ c.telegram_chat_id }}" placeholder="-1001234567890 or @channelname">
+            <small>Numeric chat/group/channel id, or <code>@channelname</code> for public channels. Add the bot to the chat first.</small>
+        </label>
+        <fieldset>
+            <legend>Send:</legend>
+            <div class="grid">
+                <label>
+                    <input type="checkbox" name="telegram_notify_critical" {% if c.telegram_notify_critical %}checked{% endif %}>
+                    Critical alerts
+                </label>
+                <label>
+                    <input type="checkbox" name="telegram_notify_warning" {% if c.telegram_notify_warning %}checked{% endif %}>
+                    Warnings
+                </label>
+                <label>
+                    <input type="checkbox" name="telegram_notify_maintenance" {% if c.telegram_notify_maintenance %}checked{% endif %}>
+                    Maintenance reminders
+                </label>
+            </div>
+        </fieldset>
     </article>
 
     <article>
@@ -61,8 +133,38 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
             File Path
             <input type="text" name="textfile_path" value="{{ c.textfile_path }}" placeholder="/var/log/kernelci-status/alerts.log">
         </label>
+        <fieldset>
+            <legend>Send:</legend>
+            <div class="grid">
+                <label>
+                    <input type="checkbox" name="textfile_notify_critical" {% if c.textfile_notify_critical %}checked{% endif %}>
+                    Critical alerts
+                </label>
+                <label>
+                    <input type="checkbox" name="textfile_notify_warning" {% if c.textfile_notify_warning %}checked{% endif %}>
+                    Warnings
+                </label>
+                <label>
+                    <input type="checkbox" name="textfile_notify_maintenance" {% if c.textfile_notify_maintenance %}checked{% endif %}>
+                    Maintenance reminders
+                </label>
+            </div>
+        </fieldset>
     </article>
 
     <button type="submit">Save Settings</button>
 </form>
+
+<article>
+    <header><h3>Test Notifications</h3></header>
+    <p>Send a test message using the saved settings above. Save your changes first.</p>
+    <div class="grid">
+        <form method="post" action="/admin/notifications/test-discord">
+            <button type="submit" class="outline">Send Test Discord Message</button>
+        </form>
+        <form method="post" action="/admin/notifications/test-telegram">
+            <button type="submit" class="outline">Send Test Telegram Message</button>
+        </form>
+    </div>
+</article>
 {% endblock %}

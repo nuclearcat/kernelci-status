@@ -8,7 +8,7 @@ use axum::extract::{Path, State};
 use axum::response::{Html, IntoResponse, Redirect};
 use serde::Deserialize;
 
-use crate::auth::AuthUser;
+use crate::auth::AdminUser;
 use crate::checkers::CheckContext;
 use crate::db::endpoints::{Endpoint, NewEndpoint};
 use crate::error::AppError;
@@ -32,7 +32,7 @@ struct TestResultTemplate<'a> {
 
 pub async fn endpoints_page(
     State(state): State<AppState>,
-    user: AuthUser,
+    user: AdminUser,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
     let endpoints = db.call(|conn| crate::db::endpoints::list_all(conn)).await?;
@@ -82,7 +82,7 @@ impl EndpointForm {
 
 pub async fn add_endpoint(
     State(state): State<AppState>,
-    _user: AuthUser,
+    _user: AdminUser,
     Form(form): Form<EndpointForm>,
 ) -> Result<impl IntoResponse, AppError> {
     let ep = form.to_new_endpoint();
@@ -98,7 +98,7 @@ pub async fn add_endpoint(
 
 pub async fn edit_endpoint(
     State(state): State<AppState>,
-    _user: AuthUser,
+    _user: AdminUser,
     Path(id): Path<i64>,
     Form(form): Form<EndpointForm>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -115,7 +115,7 @@ pub async fn edit_endpoint(
 
 pub async fn clone_endpoint(
     State(state): State<AppState>,
-    _user: AuthUser,
+    _user: AdminUser,
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
@@ -143,7 +143,7 @@ pub async fn clone_endpoint(
 
 pub async fn delete_endpoint(
     State(state): State<AppState>,
-    _user: AuthUser,
+    _user: AdminUser,
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
     let db = state.db.clone();
@@ -158,7 +158,7 @@ pub async fn delete_endpoint(
 
 pub async fn test_endpoint(
     State(state): State<AppState>,
-    _user: AuthUser,
+    _user: AdminUser,
     Form(form): Form<EndpointForm>,
 ) -> impl IntoResponse {
     let ep = Endpoint {

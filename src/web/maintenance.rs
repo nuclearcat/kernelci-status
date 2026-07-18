@@ -7,7 +7,7 @@ use axum::extract::{Path, State};
 use axum::response::{Html, IntoResponse, Redirect};
 use axum_extra::extract::Form;
 use serde::Deserialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 
 use tracing::error;
 
@@ -15,6 +15,63 @@ use crate::auth::AuthUser;
 use crate::db::maintenance::NewMaintenanceWindow;
 use crate::error::AppError;
 use crate::state::AppState;
+
+/// Maintainers may only manage maintenance for endpoints within their team scope.
+/// Returns `None` for admins (unrestricted), or `Some(allowed endpoint names)`
+/// for a maintainer (the union across their teams — empty if they're on no team).
+async fn scope_for(state: &AppState, user: &AuthUser) -> Result<Option<HashSet<String>>, AppError> {
+    if user.role == "admin" {
+        return Ok(None);
+    }
+    let uid = user.user_id;
+    let db = state.db.clone();
+    let names = db
+        .call(move |conn| crate::db::teams::allowed_endpoint_names_for_user(conn, uid))
+        .await?;
+    Ok(Some(names))
+}
+
+/// Reject if a maintainer submits endpoint names outside their scope, or none.
+fn check_submitted_names(
+    scope: &Option<HashSet<String>>,
+    names: &[String],
+) -> Result<(), AppError> {
+    if let Some(allowed) = scope {
+        if names.is_empty() {
+            return Err(AppError::BadRequest(
+                "Select at least one endpoint from your team".to_string(),
+            ));
+        }
+        if let Some(bad) = names.iter().find(|n| !allowed.contains(*n)) {
+            return Err(AppError::BadRequest(format!(
+                "Not authorized to schedule maintenance for '{bad}'"
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Reject if a maintainer tries to act on an existing window whose endpoints
+/// aren't fully within their scope. No-op for admins.
+async fn check_window_ownership(
+    state: &AppState,
+    scope: &Option<HashSet<String>>,
+    window_id: i64,
+) -> Result<(), AppError> {
+    let Some(allowed) = scope else {
+        return Ok(());
+    };
+    let db = state.db.clone();
+    let names = db
+        .call(move |conn| crate::db::maintenance::get_endpoint_names(conn, window_id))
+        .await?;
+    if names.is_empty() || !names.iter().all(|n| allowed.contains(n)) {
+        return Err(AppError::BadRequest(
+            "Not authorized to manage this maintenance window".to_string(),
+        ));
+    }
+    Ok(())
+}
 
 /// View model for a maintenance window (with resolved endpoint names and truncated times).
 struct WindowView {
@@ -33,6 +90,7 @@ struct WindowView {
 #[template(path = "maintenance.html")]
 struct MaintenanceTemplate {
     username: String,
+    is_admin: bool,
     windows: Vec<WindowView>,
     unique_names: Vec<String>,
     now: String,
@@ -51,16 +109,24 @@ pub async fn maintenance_page(
         })
         .await?;
 
-    // Unique endpoint names (sorted)
+    // Maintainers are restricted to the endpoints in their team scope.
+    let scope = scope_for(&state, &user).await?;
+    let is_admin = scope.is_none();
+
+    // Unique endpoint names (sorted), restricted to scope for maintainers.
     let unique_names: Vec<String> = {
-        let set: BTreeSet<String> = endpoints.iter().map(|e| e.name.clone()).collect();
+        let set: BTreeSet<String> = endpoints
+            .iter()
+            .map(|e| e.name.clone())
+            .filter(|n| scope.as_ref().is_none_or(|allowed| allowed.contains(n)))
+            .collect();
         set.into_iter().collect()
     };
 
     let now_full = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
     // Build view models with resolved endpoint names and truncated times
-    let windows: Vec<WindowView> = windows
+    let mut windows: Vec<WindowView> = windows
         .into_iter()
         .map(|w| {
             let names: BTreeSet<String> = w
@@ -84,11 +150,19 @@ pub async fn maintenance_page(
         })
         .collect();
 
+    // Maintainers only see windows whose endpoints are fully within their scope.
+    if let Some(allowed) = &scope {
+        windows.retain(|w| {
+            !w.endpoint_names.is_empty() && w.endpoint_names.iter().all(|n| allowed.contains(n))
+        });
+    }
+
     let now = truncate_seconds(&now_full);
 
     Ok(Html(
         MaintenanceTemplate {
             username: user.username,
+            is_admin,
             windows,
             unique_names,
             now,
@@ -151,9 +225,11 @@ fn validate_not_in_past(form: &MaintenanceForm) -> Result<(), AppError> {
 
 pub async fn add_maintenance(
     State(state): State<AppState>,
-    _user: AuthUser,
+    user: AuthUser,
     Form(form): Form<MaintenanceForm>,
 ) -> Result<impl IntoResponse, AppError> {
+    let scope = scope_for(&state, &user).await?;
+    check_submitted_names(&scope, &form.endpoint_names)?;
     validate_not_in_past(&form)?;
     let start = normalize_time(&form.start_time);
     let end = normalize_time(&form.end_time);
@@ -185,10 +261,14 @@ pub async fn add_maintenance(
 
 pub async fn edit_maintenance(
     State(state): State<AppState>,
-    _user: AuthUser,
+    user: AuthUser,
     Path(id): Path<i64>,
     Form(form): Form<MaintenanceForm>,
 ) -> Result<impl IntoResponse, AppError> {
+    let scope = scope_for(&state, &user).await?;
+    // Must own the window as it stands AND only target endpoints within scope.
+    check_window_ownership(&state, &scope, id).await?;
+    check_submitted_names(&scope, &form.endpoint_names)?;
     validate_not_in_past(&form)?;
     let start = normalize_time(&form.start_time);
     let end = normalize_time(&form.end_time);
@@ -220,9 +300,11 @@ pub async fn edit_maintenance(
 
 pub async fn delete_maintenance(
     State(state): State<AppState>,
-    _user: AuthUser,
+    user: AuthUser,
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
+    let scope = scope_for(&state, &user).await?;
+    check_window_ownership(&state, &scope, id).await?;
     let db = state.db.clone();
     db.call(move |conn| crate::db::maintenance::delete(conn, id))
         .await?;
@@ -231,9 +313,11 @@ pub async fn delete_maintenance(
 
 pub async fn close_maintenance(
     State(state): State<AppState>,
-    _user: AuthUser,
+    user: AuthUser,
     Path(id): Path<i64>,
 ) -> Result<impl IntoResponse, AppError> {
+    let scope = scope_for(&state, &user).await?;
+    check_window_ownership(&state, &scope, id).await?;
     let ended_at = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let db = state.db.clone();
     let closed = db
@@ -247,7 +331,8 @@ pub async fn close_maintenance(
     Ok(Redirect::to("/admin/maintenance"))
 }
 
-/// Check for maintenance windows starting within 1 hour and send reminder emails.
+/// Check for maintenance windows starting within 1 hour and send reminders
+/// through all enabled notification backends.
 /// Called from the scheduler after each check cycle.
 pub async fn check_maintenance_reminders(state: &AppState) {
     let db = state.db.clone();
@@ -311,27 +396,95 @@ pub async fn check_maintenance_reminders(state: &AppState) {
         }
     };
 
-    if config.get("email_enabled").is_none_or(|v| v != "true") {
+    // Which backends should receive maintenance reminders?
+    let wants = |backend: &str| {
+        config
+            .get(&format!("{backend}_enabled"))
+            .is_some_and(|v| v == "true")
+            && crate::notifications::backend_wants(&config, backend, "maintenance")
+    };
+    let (email_on, discord_on, telegram_on, textfile_on) = (
+        wants("email"),
+        wants("discord"),
+        wants("telegram"),
+        wants("textfile"),
+    );
+    if !email_on && !discord_on && !telegram_on && !textfile_on {
         return;
     }
 
     for (id, name, start_time, end_time, endpoint_names, is_deploy, changelog) in &windows {
-        let data = crate::notifications::email::MaintenanceReminderData {
-            window_name: name.clone(),
-            start_time: start_time.clone(),
-            end_time: end_time.clone(),
-            endpoint_names: endpoint_names.clone(),
-            is_deploy: *is_deploy,
-            changelog: changelog.clone(),
-        };
+        let mut sent = false;
 
-        if let Err(e) = crate::notifications::email::send_maintenance_reminder(&config, &data).await
-        {
-            error!("Failed to send maintenance reminder for '{}': {e}", name);
-            continue;
+        if email_on {
+            let data = crate::notifications::email::MaintenanceReminderData {
+                window_name: name.clone(),
+                start_time: start_time.clone(),
+                end_time: end_time.clone(),
+                endpoint_names: endpoint_names.clone(),
+                is_deploy: *is_deploy,
+                changelog: changelog.clone(),
+            };
+            match crate::notifications::email::send_maintenance_reminder(&config, &data).await {
+                Ok(()) => sent = true,
+                Err(e) => error!("Failed to send maintenance reminder for '{}': {e}", name),
+            }
         }
 
-        // Mark as sent
+        let deploy_label = if *is_deploy { " (Deploy)" } else { "" };
+        let affected = if endpoint_names.is_empty() {
+            "None specified".to_string()
+        } else {
+            endpoint_names.join(", ")
+        };
+        let text = format!(
+            "[maintenance] {name}{deploy_label} — starting in less than 1 hour | \
+             {start_time} – {end_time} UTC | Affected: {affected}"
+        );
+
+        if discord_on {
+            if let Some(url) = config.get("discord_webhook_url").filter(|u| !u.is_empty()) {
+                match crate::notifications::discord::send(&state.http_client, url, &text).await {
+                    Ok(()) => sent = true,
+                    Err(e) => error!("Discord maintenance reminder failed for '{}': {e}", name),
+                }
+            }
+        }
+
+        if telegram_on {
+            let token = config
+                .get("telegram_bot_token")
+                .cloned()
+                .unwrap_or_default();
+            let chat_id = config.get("telegram_chat_id").cloned().unwrap_or_default();
+            if !token.is_empty() && !chat_id.is_empty() {
+                match crate::notifications::telegram::send(
+                    &state.http_client,
+                    &token,
+                    &chat_id,
+                    &text,
+                )
+                .await
+                {
+                    Ok(()) => sent = true,
+                    Err(e) => error!("Telegram maintenance reminder failed for '{}': {e}", name),
+                }
+            }
+        }
+
+        if textfile_on {
+            if let Some(path) = config.get("textfile_path").filter(|p| !p.is_empty()) {
+                match crate::notifications::textfile::append(path, &text).await {
+                    Ok(()) => sent = true,
+                    Err(e) => error!("Text file maintenance reminder failed for '{}': {e}", name),
+                }
+            }
+        }
+
+        // Mark as sent if at least one backend delivered; otherwise retry next cycle
+        if !sent {
+            continue;
+        }
         let wid = *id;
         if let Err(e) = db
             .call(move |conn| crate::db::maintenance::mark_reminder_sent(conn, wid))

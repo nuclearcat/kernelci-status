@@ -89,6 +89,9 @@ pub enum Commands {
     CreateUser {
         /// Username
         username: String,
+        /// Create a maintenance-only user instead of a full admin
+        #[arg(long)]
+        maintainer: bool,
     },
     /// Change an existing user's password (reads password from stdin)
     Passwd {
