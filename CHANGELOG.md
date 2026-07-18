@@ -11,6 +11,9 @@ Author: Denys Fedoryshchenko <denys.f@collabora.com>
 ### Added
 - `passwd <username>` CLI command to reset an existing user's password and invalidate their sessions
 
+### Changed
+- Debian package build environment upgraded from Bookworm to Trixie
+
 ## 0.1.3
 
 ### Added

@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Collabora Ltd.
 # Author: Denys Fedoryshchenko <denys.f@collabora.com>
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
