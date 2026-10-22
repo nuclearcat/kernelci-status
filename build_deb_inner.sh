@@ -14,7 +14,7 @@ DEB_DIR="/build/pkg/${PKG}_${VERSION}_${ARCH}"
 echo "==> Building ${PKG} ${VERSION} for ${ARCH} ..."
 
 # ── 1. Compile release binary ──────────────────────────────────────
-cargo build --release
+cargo build --release --locked
 
 # ── 2. Assemble package tree ───────────────────────────────────────
 install -Dm755 "target/release/${PKG}" "${DEB_DIR}/usr/local/bin/${PKG}"
